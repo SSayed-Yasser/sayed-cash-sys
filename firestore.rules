@@ -1,0 +1,81 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isSystemAdmin() {
+      return signedIn()
+        && request.auth.token.email == 'sayedyassersy1@gmail.com';
+    }
+
+    function isActiveBranchMember(branchId) {
+      let membershipPath = /databases/$(database)/documents/branchMemberships/$(request.auth.uid);
+      let branchPath = /databases/$(database)/documents/branches/$(branchId);
+      return signedIn()
+        && exists(membershipPath)
+        && get(membershipPath).data.active == true
+        && get(membershipPath).data.branchId == branchId
+        && exists(branchPath)
+        && get(branchPath).data.active == true;
+    }
+
+    function canAccessOwnUserData(userId) {
+      let membershipPath = /databases/$(database)/documents/branchMemberships/$(userId);
+      return signedIn()
+        && request.auth.uid == userId
+        && exists(membershipPath)
+        && get(membershipPath).data.active == true
+        && isActiveBranchMember(get(membershipPath).data.branchId);
+    }
+
+    match /branches/{branchId} {
+      allow read: if true;
+      allow create, update, delete: if isSystemAdmin();
+    }
+
+    match /branches/{branchId}/data/{collectionName}/items/{recordId} {
+      allow read, write: if isSystemAdmin() || isActiveBranchMember(branchId);
+    }
+
+    match /branches/{branchId}/settings/{settingId} {
+      allow read, write: if isSystemAdmin() || isActiveBranchMember(branchId);
+    }
+
+    match /branches/{branchId}/activityLogs/{logId} {
+      allow read: if isSystemAdmin();
+      allow create: if (isSystemAdmin() || isActiveBranchMember(branchId))
+        && request.resource.data.branchId == branchId
+        && request.resource.data.actorUid == request.auth.uid
+        && request.resource.data.actorEmail == request.auth.token.email;
+      allow update, delete: if false;
+    }
+
+    match /branchMemberships/{userId} {
+      allow get: if isSystemAdmin() || (signedIn() && request.auth.uid == userId);
+      allow list: if isSystemAdmin();
+      allow create, update, delete: if isSystemAdmin();
+    }
+
+    match /users/{userId}/{document=**} {
+      allow read, write: if isSystemAdmin() || canAccessOwnUserData(userId);
+    }
+
+    match /branchPresence/{branchId}/devices/{deviceId} {
+      allow read: if isSystemAdmin() || isActiveBranchMember(branchId);
+      allow create: if isSystemAdmin() || (isActiveBranchMember(branchId)
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.deviceId == deviceId
+        && request.resource.data.enabled == true);
+      allow update: if isSystemAdmin() || (isActiveBranchMember(branchId)
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.deviceId == deviceId
+        && request.resource.data.get('enabled', true) == resource.data.get('enabled', true)
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['lastSeen', 'deviceName', 'email', 'userAgent']));
+      allow delete: if isSystemAdmin();
+    }
+  }
+}
