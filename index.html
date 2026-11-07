@@ -593,8 +593,8 @@
                 </div>
                 <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
                     <div>
-                        <p class="text-xs text-slate-500 font-bold">عمولات اليوم</p>
-                        <p x-show="!shouldHideDailyFees" :class="shouldBlurDailyFees ? 'blur-sm select-none' : ''" class="text-lg font-black text-amber-600 num-en" x-text="formatMoney(calculateTodayFees()) + ' ج'"></p>
+                        <p class="text-xs text-slate-500 font-bold">أرباح الشيفت</p>
+                        <p x-show="!shouldHideDailyFees" :class="shouldBlurDailyFees ? 'blur-sm select-none' : ''" class="text-lg font-black text-amber-600 num-en" x-text="formatMoney(calculateCurrentShiftProfit()) + ' ج'"></p>
                         <p x-show="shouldHideDailyFees" class="text-sm font-bold text-slate-400">مخفية بواسطة الإدارة</p>
                     </div>
                     <div class="p-2 bg-amber-50 text-amber-600 rounded-lg"><i data-lucide="trending-up" class="w-5 h-5"></i></div>
@@ -829,7 +829,7 @@
                     <div class="flex flex-wrap items-center justify-between gap-3">
                         <div>
                             <h2 class="text-lg font-extrabold text-blue-950">إدارة الفروع وحساباتها</h2>
-                            <p class="mt-1 max-w-3xl text-sm leading-6 text-blue-900">إدارة الفروع والحسابات والنسخ الاحتياطي من مكان واحد. لكل فرع إعداد مستقل لإظهار أرباح اليوم أو تمويهها أو إخفائها عن المستخدم العادي.</p>
+                            <p class="mt-1 max-w-3xl text-sm leading-6 text-blue-900">إدارة الفروع والحسابات والنسخ الاحتياطي من مكان واحد. لكل فرع إعداد مستقل لإظهار أرباح الشيفت أو تمويهها أو إخفائها عن المستخدم العادي.</p>
                             <p class="mt-1 text-xs font-extrabold text-rose-700">جلسة المدير المسجلة تملك صلاحية إدارة الفروع والنسخ؛ سجّل الخروج عند استخدام جهاز مشترك.</p>
                         </div>
                     </div>
@@ -907,7 +907,7 @@
                                     </label>
                                 </div>
                                 <div class="grid gap-3 sm:grid-cols-2">
-                                    <label class="space-y-1.5 text-xs font-bold text-slate-700">خصوصية أرباح اليوم
+                                    <label class="space-y-1.5 text-xs font-bold text-slate-700">خصوصية أرباح الشيفت
                                         <select :value="branch.dailyFeesVisibility" @change="setBranchDailyFeesVisibility(branch, $event.target.value)" :disabled="managerBusy" class="w-full rounded-lg border border-slate-200 bg-white p-2.5">
                                             <option value="show">إظهار الأرباح</option>
                                             <option value="blur">تمويه الأرباح</option>
@@ -1949,14 +1949,13 @@
             'سجل النشاط': 'Activity Log',
             'آخر ظهور: ': 'Last seen: ',
             'السماح لحساب الفرع بدخول لوحة الإدارة': 'Allow this branch account to access the admin dashboard',
-            'خصوصية أرباح اليوم': 'Daily Profit Visibility',
+            'خصوصية أرباح الشيفت': 'Shift Profit Visibility',
             'إظهار الأرباح': 'Show profits',
             'تمويه الأرباح': 'Blur profits',
             'إخفاء الأرباح': 'Hide profits',
             'المحافظ والخطوط': 'Wallets & Lines',
             'إيداع (العميل يدفع كاش)': 'Deposit (customer pays cash)',
             'سحب (تحويل للمحفظة)': 'Withdrawal (transfer to wallet)',
-            'عمولات اليوم': 'Today’s Fees',
             'عمليات اليوم': 'Today’s Transactions',
             'سجل عمليات اليوم': 'Today’s Transactions',
             'سحوبات اليوم': 'Today’s Withdrawals',
@@ -2451,7 +2450,7 @@
             'آخر أرقام': 'Last Digits',
             'إدارة النسخ الاحتياطي للسيستم': 'System Backup Management',
             'إدارة الفروع وحساباتها': 'Manage Branches and Accounts',
-            'إدارة الفروع والحسابات والنسخ الاحتياطي من مكان واحد. لكل فرع إعداد مستقل لإظهار أرباح اليوم أو تمويهها أو إخفائها عن المستخدم العادي.': 'Manage branches, accounts, and backups in one place. Each branch has separate settings to show, blur, or hide today’s profits from regular users.',
+            'إدارة الفروع والحسابات والنسخ الاحتياطي من مكان واحد. لكل فرع إعداد مستقل لإظهار أرباح الشيفت أو تمويهها أو إخفائها عن المستخدم العادي.': 'Manage branches, accounts, and backups from one place. Each branch has separate settings to show, blur, or hide shift profits from regular users.',
             'جلسة المدير المسجلة تملك صلاحية إدارة الفروع والنسخ؛ سجّل الخروج عند استخدام جهاز مشترك.': 'The signed-in manager session can manage branches and backups. Sign out when using a shared device.',
             'الاستعادة تستبدل بيانات الفروع المحددة وإعداداتها وصلاحيات الحسابات، ولا تستعيد كلمات المرور أو سجل النشاط.': 'Restore replaces the selected branches’ data, settings, and account permissions. Passwords and activity logs are not restored.',
             'كل بيانات النظام تُقرأ وتُحفظ مباشرة في Firestore بعد تسجيل الدخول. لا يعتمد النظام على تخزين المتصفح. يمكنك تنزيل نسخة JSON يدويًا أو اختيار مجلد لحفظ نسخ احتياطية بعد كل عملية حفظ.': 'System data is read from and saved directly to Firestore after sign-in; it is not stored in the browser. Download a JSON backup manually or choose a folder for automatic backups after each save.',
@@ -2848,7 +2847,7 @@
                             [/^تم تشغيل جهاز (.+) في فرع "(.+)"\.$/, 'Enabled device $1 on branch "$2".'],
                             [/^تم إيقاف جهاز (.+) في فرع "(.+)"\.$/, 'Disabled device $1 on branch "$2".'],
                             [/^تم حذف جهاز (.+) من فرع "(.+)"\.$/, 'Deleted device $1 from branch "$2".'],
-                            [/^تم حفظ أرباح اليوم لفرع "(.+)": (.+) للمستخدم العادي\.$/, 'Saved daily profit visibility for branch "$1": $2 for regular users.'],
+                            [/^تم حفظ أرباح الشيفت لفرع "(.+)": (.+) للمستخدم العادي\.$/, 'Saved shift profit visibility for branch "$1": $2 for regular users.'],
                             [/^تم تنزيل نسخة بيانات (\d+) فرع\.$/, 'Downloaded data for $1 branch(es).'],
                             [/^تم إنشاء الفرع "(.+)" وربط حسابه\. كلمة المرور لم تُحفظ في قاعدة البيانات\.$/, 'Created branch "$1" and linked its account. The password was not saved to the database.'],
                             [/^تم تحديث بيانات الفرع\. تأكد أن البريد المستخدم لتسجيل الدخول يحتوي على كلمة تمييز البريد الجديدة\.$/, 'Branch details updated. Make sure the sign-in email contains the new branch keyword.'],
@@ -2875,7 +2874,7 @@
                             [/^Enabled device (.+) on branch "(.+)"\.$/, 'تم تشغيل جهاز $1 في فرع "$2".'],
                             [/^Disabled device (.+) on branch "(.+)"\.$/, 'تم إيقاف جهاز $1 في فرع "$2".'],
                             [/^Deleted device (.+) from branch "(.+)"\.$/, 'تم حذف جهاز $1 من فرع "$2".'],
-                            [/^Saved daily profit visibility for branch "(.+)": (.+) for regular users\.$/, 'تم حفظ أرباح اليوم لفرع "$1": $2 للمستخدم العادي.'],
+                            [/^Saved shift profit visibility for branch "(.+)": (.+) for regular users\.$/, 'تم حفظ أرباح الشيفت لفرع "$1": $2 للمستخدم العادي.'],
                             [/^Downloaded data for (\d+) branch\(es\)\.$/, 'تم تنزيل نسخة بيانات $1 فرع.'],
                             [/^Created branch "(.+)" and linked its account\. The password was not saved to the database\.$/, 'تم إنشاء الفرع "$1" وربط حسابه. كلمة المرور لم تُحفظ في قاعدة البيانات.'],
                             [/^Branch details updated\. Make sure the sign-in email contains the new branch keyword\.$/, 'تم تحديث بيانات الفرع. تأكد أن البريد المستخدم لتسجيل الدخول يحتوي على كلمة تمييز البريد الجديدة.'],
@@ -3641,7 +3640,7 @@
                         await this.firebaseService.setBranchDailyFeesVisibility(branch.id, visibility);
                         branch.dailyFeesVisibility = visibility;
                         const labels = { show: 'ظاهرة', blur: 'مموهة', hide: 'مخفية' };
-                        this.managerStatus = `تم حفظ أرباح اليوم لفرع "${branch.name}": ${labels[visibility]} للمستخدم العادي.`;
+                        this.managerStatus = `تم حفظ أرباح الشيفت لفرع "${branch.name}": ${labels[visibility]} للمستخدم العادي.`;
                     } catch (error) {
                         this.managerError = this.describeFirebaseError(error);
                         await this.loadManagedBranches();
