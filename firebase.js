@@ -31,6 +31,7 @@ import {
     where,
     writeBatch
 } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-functions.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyBwlmW9BAKLNC-susT453LcXNERYxoOaUw",
@@ -131,6 +132,20 @@ async function listBranchAccounts() {
     }));
 }
 
+async function callManagerFunction(name, data) {
+    const callable = httpsCallable(getFunctions(app, "us-central1"), name);
+    const result = await callable(data);
+    return result.data;
+}
+
+function getBranchAccountEmails(branchIds) {
+    return callManagerFunction("getBranchAccountEmails", { branchIds }).then(result => result.emails);
+}
+
+function setBranchAccountPassword(branchId, password) {
+    return callManagerFunction("setBranchAccountPassword", { branchId, password });
+}
+
 async function createBranch({ name, emailKeyword, email, password }) {
     const normalizedEmail = email.trim().toLowerCase();
     const normalizedKeyword = emailKeyword.trim().toLowerCase();
@@ -186,12 +201,13 @@ async function createBranch({ name, emailKeyword, email, password }) {
     });
     batch.set(doc(database, "branchMemberships", uid), {
         branchId: branchReference.id,
+        email: normalizedEmail,
         active: true,
         canAccessAdmin: false,
         createdAt: Date.now()
     });
     await batch.commit();
-    return { id: branchReference.id, name: name.trim(), emailKeyword: normalizedKeyword, active: true, account: { uid, branchId: branchReference.id, active: true, canAccessAdmin: false } };
+    return { id: branchReference.id, name: name.trim(), emailKeyword: normalizedKeyword, active: true, account: { uid, email: normalizedEmail, branchId: branchReference.id, active: true, canAccessAdmin: false } };
 }
 
 async function updateBranchDetails(branchId, name, emailKeyword) {
@@ -1014,6 +1030,8 @@ const firebaseService = {
     getBranchServerTime,
     checkBranchConnection,
     listBranchAccounts,
+    getBranchAccountEmails,
+    setBranchAccountPassword,
     createBranch,
     updateBranchDetails,
     removeBranch,

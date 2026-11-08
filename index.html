@@ -16,7 +16,43 @@
         body { font-family: 'Cairo', sans-serif; }
         html.english-mode body { direction: ltr; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
         html.english-mode [class~="text-right"] { text-align: left !important; }
-        .num-en { font-family: system-ui, -apple-system, sans-serif; font-weight: 700; }
+        .num-en { direction: ltr; font-family: system-ui, -apple-system, sans-serif; font-variant-numeric: lining-nums tabular-nums; font-weight: 700; unicode-bidi: isolate; }
+        .cashier-limit-card[data-cashier-workflow] { position: relative; isolation: isolate; padding-top: 3.5rem; }
+        .cashier-limit-ribbon {
+            position: absolute;
+            z-index: 20;
+            top: -.625rem;
+            right: 1rem;
+            display: flex;
+            width: min(600px, calc(100% - 2rem));
+            max-width: calc(100% - 2rem);
+            align-items: stretch;
+            border: 1px solid #dbe7f3;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, .98);
+            padding: 13px 20px;
+            box-shadow: 0 8px 20px rgba(30, 55, 90, .12);
+            backdrop-filter: blur(12px);
+        }
+        html.english-mode .cashier-limit-ribbon { right: auto; left: 1rem; }
+        .cashier-limit-group { min-width: 0; flex: 1 1 0%; }
+        .cashier-limit-group b.num-en { font-size: 10px; font-weight: 800; }
+        .cashier-limit-separator {
+            width: 1px;
+            flex: 0 0 1px;
+            align-self: stretch;
+            margin: 2px 12px;
+            background: linear-gradient(transparent, #cbd5e1 18%, #cbd5e1 82%, transparent);
+        }
+        .cashier-limit-progress { height: 3px; overflow: hidden; border-radius: 9999px; background: #eef2f7; }
+        .cashier-limit-progress > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #f87171, #e11d48); transition: width .25s ease; }
+        @media (max-width: 420px) {
+            .cashier-limit-ribbon { right: .75rem; width: calc(100% - 1.5rem); max-width: calc(100% - 1.5rem); padding: 10px 8px; }
+            html.english-mode .cashier-limit-ribbon { right: auto; left: .75rem; }
+            .cashier-limit-group { font-size: 9px; }
+            .cashier-limit-group b.num-en { font-size: 9px; }
+            .cashier-limit-separator { margin-right: 7px; margin-left: 7px; }
+        }
         [x-cloak] { display: none !important; }
         input[type="number"] {
             appearance: textfield;
@@ -337,6 +373,8 @@
             border-color: #2a3a52 !important;
         }
         html.dark-mode [class~="bg-blue-50"],
+        html.dark-mode [class~="bg-sky-50"],
+        html.dark-mode [class~="bg-indigo-50"],
         html.dark-mode [class~="bg-emerald-50"],
         html.dark-mode [class~="bg-green-50"],
         html.dark-mode [class~="bg-rose-50"],
@@ -347,17 +385,28 @@
         html.dark-mode [class~="bg-purple-50"],
         html.dark-mode [class~="bg-orange-50"],
         html.dark-mode [class~="bg-cyan-50"],
-        html.dark-mode [class~="bg-teal-50"] {
+        html.dark-mode [class~="bg-teal-50"],
+        html.dark-mode [class~="bg-fuchsia-50"],
+        html.dark-mode [class~="bg-pink-50"],
+        html.dark-mode [class~="bg-lime-50"] {
             background-color: #1b2a40 !important;
         }
         html.dark-mode [class~="bg-emerald-100"],
         html.dark-mode [class~="bg-green-100"],
         html.dark-mode [class~="bg-blue-100"],
+        html.dark-mode [class~="bg-sky-100"],
+        html.dark-mode [class~="bg-indigo-100"],
         html.dark-mode [class~="bg-rose-100"],
         html.dark-mode [class~="bg-red-100"],
         html.dark-mode [class~="bg-amber-100"],
+        html.dark-mode [class~="bg-orange-100"],
         html.dark-mode [class~="bg-violet-100"],
-        html.dark-mode [class~="bg-purple-100"] {
+        html.dark-mode [class~="bg-purple-100"],
+        html.dark-mode [class~="bg-cyan-100"],
+        html.dark-mode [class~="bg-teal-100"],
+        html.dark-mode [class~="bg-yellow-100"],
+        html.dark-mode [class~="bg-fuchsia-100"],
+        html.dark-mode [class~="bg-pink-100"] {
             background-color: #263750 !important;
         }
         html.dark-mode [class*="text-emerald-"],
@@ -368,7 +417,19 @@
         html.dark-mode [class*="text-amber-"],
         html.dark-mode [class*="text-orange-"] { color: #fcd34d !important; }
         html.dark-mode [class*="text-violet-"],
-        html.dark-mode [class*="text-purple-"] { color: #c4b5fd !important; }
+        html.dark-mode [class*="text-purple-"],
+        html.dark-mode [class*="text-indigo-"],
+        html.dark-mode [class*="text-fuchsia-"],
+        html.dark-mode [class*="text-pink-"] { color: #c4b5fd !important; }
+        html.dark-mode [class*="text-cyan-"],
+        html.dark-mode [class*="text-teal-"] { color: #67e8f9 !important; }
+        html.dark-mode [class*="text-sky-"] { color: #7dd3fc !important; }
+        html.dark-mode [class*="text-yellow-"],
+        html.dark-mode [class*="text-lime-"] { color: #fde68a !important; }
+        html.dark-mode [class*="from-"][class*="to-"] {
+            background-image: none !important;
+            background-color: #111c2f !important;
+        }
         html.dark-mode input:not([type="checkbox"]):not([type="radio"]),
         html.dark-mode select,
         html.dark-mode textarea {
@@ -385,6 +446,12 @@
             background: linear-gradient(145deg, #0b1220, #14243a 55%, #101a2c) !important;
         }
         html.dark-mode .firebase-login-card { background: rgba(17, 28, 47, .96) !important; }
+        html.dark-mode .cashier-limit-ribbon {
+            border-color: #354760 !important;
+            background: rgba(17, 28, 47, .98) !important;
+        }
+        html.dark-mode .cashier-limit-progress { background: #293950 !important; }
+        html.dark-mode .cashier-limit-separator { background: linear-gradient(transparent, #52647e 18%, #52647e 82%, transparent); }
         html.dark-mode .splash-screen { background: #0b1220; color: #e2e8f0; }
         html.dark-mode .splash-brand { color: #e2e8f0; }
         html.dark-mode ::-webkit-scrollbar-track { background: #111c2f; }
@@ -612,8 +679,34 @@
             <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 
                 <!-- DEPOSIT (إيداع) -->
-                <div data-cashier-workflow="deposit" class="order-2 flex flex-col justify-between rounded-2xl border-2 border-emerald-500/30 bg-white p-4 shadow-sm lg:order-2">
+                <div data-cashier-workflow="deposit" :class="getCashierLimitSummary('deposit').exceeded ? 'border-rose-500' : 'border-emerald-500/30'" class="cashier-limit-card order-2 flex flex-col justify-between rounded-2xl border-2 bg-white p-4 shadow-sm lg:order-2">
                     <div>
+                        <div x-show="getCashierLimitSummary('deposit').applies" x-cloak class="cashier-limit-ribbon" :class="getCashierLimitSummary('deposit').exceeded ? 'border-rose-200' : 'border-emerald-200'">
+                            <div class="cashier-limit-group space-y-0.5">
+                                <div class="flex items-center justify-between gap-2 text-[11px] font-extrabold leading-tight">
+                                    <span class="text-slate-500">الحد الشهري</span>
+                                    <span class="num-en text-slate-400">200,000</span>
+                                </div>
+                                <div class="flex items-center justify-between gap-1 text-[9px] font-extrabold leading-tight">
+                                    <span class="whitespace-nowrap text-rose-600">المستخدم <b class="num-en" x-text="formatMoney(getCashierLimitSummary('deposit').monthlyUsed)"></b></span>
+                                    <span class="whitespace-nowrap text-emerald-700">المتبقي <b class="num-en" x-text="formatMoney(getCashierLimitSummary('deposit').monthlyRemaining)"></b></span>
+                                </div>
+                                <div class="cashier-limit-progress"><span :style="'width:' + getCashierLimitSummary('deposit').monthlyPercent + '%'"></span></div>
+                            </div>
+                            <div class="cashier-limit-separator"></div>
+                            <div class="cashier-limit-group space-y-0.5">
+                                <div class="flex items-center justify-between gap-2 text-[11px] font-extrabold leading-tight">
+                                    <span class="text-slate-500">الحد اليومي</span>
+                                    <span class="num-en text-slate-400">60,000</span>
+                                </div>
+                                <div class="flex items-center justify-between gap-1 text-[9px] font-extrabold leading-tight">
+                                    <span class="whitespace-nowrap text-rose-600">المستخدم <b class="num-en" x-text="formatMoney(getCashierLimitSummary('deposit').dailyUsed)"></b></span>
+                                    <span class="whitespace-nowrap text-emerald-700">المتاح <b class="num-en" x-text="formatMoney(getCashierLimitSummary('deposit').dailyAvailable)"></b></span>
+                                </div>
+                                <div class="cashier-limit-progress"><span :style="'width:' + getCashierLimitSummary('deposit').dailyPercent + '%'"></span></div>
+                            </div>
+                        </div>
+                        <p x-show="getCashierLimitSummary('deposit').applies && (!getCashierLimitSummary('deposit').ready || getCashierLimitSummary('deposit').exceeded)" class="-mt-1 mb-2 text-center text-[9px] font-extrabold text-rose-700" x-text="!getCashierLimitSummary('deposit').ready ? 'انتظر التحقق من وقت الخادم.' : 'تجاوزت المبلغ المتاح على الخط.'"></p>
                         <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
                             <span class="bg-emerald-100 text-emerald-800 font-bold px-3 py-1 rounded-full text-sm flex items-center gap-1">
                                 <i data-lucide="arrow-down-left" class="w-4 h-4"></i> إيداع (العميل يدفع كاش)
@@ -627,11 +720,14 @@
                                 <label class="block text-xs font-bold text-slate-600 mb-1">اختر الخط/المحفظة للإيداع:</label>
                                 <div class="flex gap-2">
                                                     <div class="relative min-w-0 flex-1" @click.outside="cashierWalletDropdown.deposit = false">
-                                                        <input type="search" :value="cashierWalletDropdown.deposit ? cashierWalletSearch.deposit : getCashierWalletLabel('deposit')" @focus="openCashierWalletSearch('deposit')" @input="cashierWalletSearch.deposit = $event.target.value; onCashierWalletSearch('deposit')" @keydown.arrow-down.prevent="moveWalletSearch('deposit', 1)" @keydown.arrow-up.prevent="moveWalletSearch('deposit', -1)" @keydown.enter.prevent="selectWalletSearchResult('deposit')" placeholder="ابحث باسم الخط أو رقمه..." autocomplete="off" class="w-full rounded-xl border border-slate-300 bg-slate-50 p-2.5 text-sm font-bold text-slate-800">
+                                                        <input type="search" :value="cashierWalletDropdown.deposit ? cashierWalletSearch.deposit : getCashierWalletLabel('deposit')" @focus="openCashierWalletSearch('deposit')" @input="cashierWalletSearch.deposit = $event.target.value; onCashierWalletSearch('deposit')" @keydown.arrow-down.prevent="moveWalletSearch('deposit', 1)" @keydown.arrow-up.prevent="moveWalletSearch('deposit', -1)" @keydown.enter.prevent="selectWalletSearchResult('deposit')" :class="getCashierWalletStatusClass('deposit')" placeholder="ابحث باسم الخط أو رقمه..." autocomplete="off" class="w-full rounded-xl border border-slate-300 bg-slate-50 p-2.5 text-sm font-bold text-slate-800">
                                         <div x-show="cashierWalletDropdown.deposit" x-cloak class="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl">
                                             <template x-for="(w, index) in getFilteredCashierWallets('deposit')" :key="'deposit-search-' + w.id">
                                                 <button type="button" @click="selectCashierWallet('deposit', w)" @mouseenter="cashierWalletActiveIndex.deposit = index" :class="cashierWalletActiveIndex.deposit === index ? 'bg-blue-50' : 'hover:bg-slate-50'" class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-right text-xs">
-                                                    <span class="font-extrabold text-slate-800" x-text="w.name + ' (' + w.phone + ')'"></span>
+                                                    <span class="flex items-center gap-2 font-extrabold text-slate-800">
+                                                        <span x-show="getWalletCategory(w) === 'line'" :class="isWalletOperational(w) ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'" class="rounded-full px-2 py-0.5 text-[10px]" x-text="isWalletOperational(w) ? 'شغال' : 'متوقف'"></span>
+                                                        <span x-text="w.name + ' (' + w.phone + ')'"></span>
+                                                    </span>
                                                     <span class="font-bold text-slate-500" x-text="formatMoney(w.balance) + ' ج'"></span>
                                                 </button>
                                             </template>
@@ -669,15 +765,41 @@
                             <span class="text-xs text-slate-500 font-bold block">إجمالي المطلوب من العميل:</span>
                             <span class="text-xl font-black text-emerald-600 num-en" x-text="formatMoney((cashierDeposit.amount || 0) + (cashierDeposit.fee || 0)) + ' ج'"></span>
                         </div>
-                        <button @click="executeTransaction('deposit')" :disabled="cashierSaveInProgress" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-3 rounded-xl shadow-lg hover:shadow-emerald-200 transition flex items-center gap-2 disabled:cursor-wait disabled:opacity-60">
+                        <button @click="executeTransaction('deposit')" :disabled="cashierSaveInProgress || isCashierAmountOverLimit('deposit')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-3 rounded-xl shadow-lg hover:shadow-emerald-200 transition flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50">
                             <i data-lucide="check-circle" class="w-5 h-5"></i> <span x-text="cashierSaveInProgress ? 'جاري الحفظ...' : 'تنفيذ الإيداع'"></span>
                         </button>
                     </div>
                 </div>
 
                 <!-- WITHDRAWAL (سحب) -->
-                <div data-cashier-workflow="withdraw" class="order-1 flex flex-col justify-between rounded-2xl border-2 border-rose-500/30 bg-white p-4 shadow-sm lg:order-1">
+                <div data-cashier-workflow="withdraw" :class="getCashierLimitSummary('withdraw').exceeded ? 'border-rose-500' : 'border-emerald-500/30'" class="cashier-limit-card order-1 flex flex-col justify-between rounded-2xl border-2 bg-white p-4 shadow-sm lg:order-1">
                     <div>
+                        <div x-show="getCashierLimitSummary('withdraw').applies" x-cloak class="cashier-limit-ribbon" :class="getCashierLimitSummary('withdraw').exceeded ? 'border-rose-200' : 'border-emerald-200'">
+                            <div class="cashier-limit-group space-y-0.5">
+                                <div class="flex items-center justify-between gap-2 text-[11px] font-extrabold leading-tight">
+                                    <span class="text-slate-500">الحد الشهري</span>
+                                    <span class="num-en text-slate-400">200,000</span>
+                                </div>
+                                <div class="flex items-center justify-between gap-1 text-[9px] font-extrabold leading-tight">
+                                    <span class="whitespace-nowrap text-rose-600">المستخدم <b class="num-en" x-text="formatMoney(getCashierLimitSummary('withdraw').monthlyUsed)"></b></span>
+                                    <span class="whitespace-nowrap text-emerald-700">المتبقي <b class="num-en" x-text="formatMoney(getCashierLimitSummary('withdraw').monthlyRemaining)"></b></span>
+                                </div>
+                                <div class="cashier-limit-progress"><span :style="'width:' + getCashierLimitSummary('withdraw').monthlyPercent + '%'"></span></div>
+                            </div>
+                            <div class="cashier-limit-separator"></div>
+                            <div class="cashier-limit-group space-y-0.5">
+                                <div class="flex items-center justify-between gap-2 text-[11px] font-extrabold leading-tight">
+                                    <span class="text-slate-500">الحد اليومي</span>
+                                    <span class="num-en text-slate-400">60,000</span>
+                                </div>
+                                <div class="flex items-center justify-between gap-1 text-[9px] font-extrabold leading-tight">
+                                    <span class="whitespace-nowrap text-rose-600">المستخدم <b class="num-en" x-text="formatMoney(getCashierLimitSummary('withdraw').dailyUsed)"></b></span>
+                                    <span class="whitespace-nowrap text-emerald-700">المتاح <b class="num-en" x-text="formatMoney(getCashierLimitSummary('withdraw').dailyAvailable)"></b></span>
+                                </div>
+                                <div class="cashier-limit-progress"><span :style="'width:' + getCashierLimitSummary('withdraw').dailyPercent + '%'"></span></div>
+                            </div>
+                        </div>
+                        <p x-show="getCashierLimitSummary('withdraw').applies && (!getCashierLimitSummary('withdraw').ready || getCashierLimitSummary('withdraw').exceeded)" class="-mt-1 mb-2 text-center text-[9px] font-extrabold text-rose-700" x-text="!getCashierLimitSummary('withdraw').ready ? 'انتظر التحقق من وقت الخادم.' : 'تجاوزت المبلغ المتاح على الخط.'"></p>
                         <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
                             <span class="shrink-0 whitespace-nowrap rounded-full bg-rose-100 px-3 py-1 text-xs font-bold text-rose-800 flex items-center gap-1 sm:text-sm">
                                 <i data-lucide="arrow-up-right" class="h-4 w-4 shrink-0"></i> سحب (تحويل للمحفظة)
@@ -691,11 +813,14 @@
                                     <label class="block text-xs font-bold text-slate-600 mb-1">اختر المحفظة التي سيحوّل العميل إليها:</label>
                                 <div class="flex gap-2">
                                     <div class="relative min-w-0 flex-1" @click.outside="cashierWalletDropdown.withdraw = false">
-                                        <input type="search" :value="cashierWalletDropdown.withdraw ? cashierWalletSearch.withdraw : getCashierWalletLabel('withdraw')" @focus="openCashierWalletSearch('withdraw')" @input="cashierWalletSearch.withdraw = $event.target.value; onCashierWalletSearch('withdraw')" @keydown.arrow-down.prevent="moveWalletSearch('withdraw', 1)" @keydown.arrow-up.prevent="moveWalletSearch('withdraw', -1)" @keydown.enter.prevent="selectWalletSearchResult('withdraw')" placeholder="ابحث باسم الخط أو رقمه..." autocomplete="off" class="w-full rounded-xl border border-slate-300 bg-slate-50 p-2.5 text-sm font-bold text-slate-800">
+                                        <input type="search" :value="cashierWalletDropdown.withdraw ? cashierWalletSearch.withdraw : getCashierWalletLabel('withdraw')" @focus="openCashierWalletSearch('withdraw')" @input="cashierWalletSearch.withdraw = $event.target.value; onCashierWalletSearch('withdraw')" @keydown.arrow-down.prevent="moveWalletSearch('withdraw', 1)" @keydown.arrow-up.prevent="moveWalletSearch('withdraw', -1)" @keydown.enter.prevent="selectWalletSearchResult('withdraw')" :class="getCashierWalletStatusClass('withdraw')" placeholder="ابحث باسم الخط أو رقمه..." autocomplete="off" class="w-full rounded-xl border border-slate-300 bg-slate-50 p-2.5 text-sm font-bold text-slate-800">
                                         <div x-show="cashierWalletDropdown.withdraw" x-cloak class="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl">
                                             <template x-for="(w, index) in getFilteredCashierWallets('withdraw')" :key="'withdraw-search-' + w.id">
                                                 <button type="button" @click="selectCashierWallet('withdraw', w)" @mouseenter="cashierWalletActiveIndex.withdraw = index" :class="cashierWalletActiveIndex.withdraw === index ? 'bg-blue-50' : 'hover:bg-slate-50'" class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-right text-xs">
-                                                    <span class="font-extrabold text-slate-800" x-text="w.name + ' (' + w.phone + ')'"></span>
+                                                    <span class="flex items-center gap-2 font-extrabold text-slate-800">
+                                                        <span x-show="getWalletCategory(w) === 'line'" :class="isWalletOperational(w) ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'" class="rounded-full px-2 py-0.5 text-[10px]" x-text="isWalletOperational(w) ? 'شغال' : 'متوقف'"></span>
+                                                        <span x-text="w.name + ' (' + w.phone + ')'"></span>
+                                                    </span>
                                                     <span class="font-bold text-slate-500" x-text="formatMoney(w.balance) + ' ج'"></span>
                                                 </button>
                                             </template>
@@ -733,7 +858,7 @@
                             <span class="text-xs text-slate-500 font-bold block">صافي المدفوع للعميل نقداً:</span>
                             <span class="text-xl font-black text-rose-600 num-en" x-text="formatMoney(Math.max(0, (cashierWithdraw.amount || 0) - (cashierWithdraw.fee || 0))) + ' ج'"></span>
                         </div>
-                        <button @click="executeTransaction('withdraw')" :disabled="cashierSaveInProgress" class="bg-rose-600 hover:bg-rose-700 text-white font-bold px-6 py-3 rounded-xl shadow-lg hover:shadow-rose-200 transition flex items-center gap-2 disabled:cursor-wait disabled:opacity-60">
+                        <button @click="executeTransaction('withdraw')" :disabled="cashierSaveInProgress || isCashierAmountOverLimit('withdraw')" class="bg-rose-600 hover:bg-rose-700 text-white font-bold px-6 py-3 rounded-xl shadow-lg hover:shadow-rose-200 transition flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50">
                             <i data-lucide="check-circle" class="w-5 h-5"></i> <span x-text="cashierSaveInProgress ? 'جاري الحفظ...' : 'تنفيذ السحب'"></span>
                         </button>
                     </div>
@@ -890,6 +1015,7 @@
                                     <div class="min-w-0">
                                         <h4 class="truncate font-extrabold text-slate-900" x-text="branch.name"></h4>
                                         <p class="mt-1 text-xs text-slate-500" dir="ltr" x-text="branch.emailKeyword"></p>
+                                        <p class="mt-1 break-all text-[11px] font-bold text-blue-700" dir="ltr" x-text="branch.account?.email || branch.devices?.find(device => device.email)?.email || 'معرّف الحساب: ' + (branch.account?.uid || 'غير متاح')"></p>
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-2">
@@ -931,7 +1057,7 @@
                                                         <span :class="device.enabled ? 'bg-blue-100 text-blue-800' : 'bg-rose-100 text-rose-800'" class="rounded-full px-2 py-0.5 text-[10px] font-extrabold" x-text="device.enabled ? 'مسموح' : 'موقوف'"></span>
                                                     </div>
                                                     <p class="mt-1 truncate text-[11px] text-slate-500" dir="ltr" x-text="(device.email || device.uid || 'حساب غير معروف') + ' • ' + String(device.deviceId || '').slice(-8)"></p>
-                                                    <p class="mt-1 text-[10px] text-slate-400" x-text="device.lastSeen ? 'آخر ظهور: ' + new Date(device.lastSeen).toLocaleString(language === 'en' ? 'en-US' : 'ar-EG') : 'لا يوجد وقت ظهور'"></p>
+                                                    <p class="mt-1 text-[10px] text-slate-400" x-text="device.lastSeen ? 'آخر ظهور: ' + new Date(device.lastSeen).toLocaleString(getDateTimeLocale()) : 'لا يوجد وقت ظهور'"></p>
                                                 </div>
                                                 <button @click="setManagedDeviceEnabled(branch, device, !device.enabled)" :disabled="managerBusy" :class="device.enabled ? 'bg-rose-600 hover:bg-rose-700' : 'bg-emerald-600 hover:bg-emerald-700'" class="shrink-0 rounded-lg px-3 py-2 text-xs font-extrabold text-white disabled:opacity-50" x-text="device.enabled ? 'إيقاف الجهاز' : 'تشغيل الجهاز'"></button>
                                                 <button @click="deleteManagedDevice(branch, device)" :disabled="managerBusy" class="shrink-0 rounded-lg bg-slate-700 px-3 py-2 text-xs font-extrabold text-white hover:bg-slate-800 disabled:opacity-50">حذف الجهاز</button>
@@ -944,6 +1070,19 @@
                                     <input type="checkbox" :checked="branch.account?.canAccessAdmin === true" :disabled="!branch.account || managerBusy" @change="updateBranchPermission(branch, 'canAccessAdmin', $event.target.checked)" class="h-4 w-4 rounded border-slate-300 text-blue-600">
                                     السماح لحساب الفرع بدخول لوحة الإدارة
                                 </label>
+                                <form x-show="branch.account?.uid" @submit.prevent="changeManagedBranchPassword(branch)" class="space-y-2 rounded-xl border border-amber-200 bg-amber-50/60 p-3">
+                                    <h5 class="flex items-center gap-2 text-xs font-extrabold text-amber-900"><i data-lucide="key-round" class="h-4 w-4"></i> تعيين كلمة مرور جديدة لهذا الفرع</h5>
+                                    <p class="text-[11px] font-semibold leading-5 text-amber-900">التغيير يتم من صلاحية المدير مباشرة؛ لن تظهر كلمة المرور القديمة ولن تُحفظ هنا.</p>
+                                    <div class="grid gap-2 sm:grid-cols-2">
+                                        <label class="space-y-1 text-[11px] font-bold text-slate-700">كلمة المرور الجديدة
+                                            <input type="password" x-model="branch.passwordDraft" minlength="6" required autocomplete="new-password" :disabled="managerBusy" class="w-full rounded-lg border border-slate-200 bg-white p-2 text-left" dir="ltr">
+                                        </label>
+                                        <label class="space-y-1 text-[11px] font-bold text-slate-700">تأكيد كلمة المرور الجديدة
+                                            <input type="password" x-model="branch.passwordConfirmDraft" minlength="6" required autocomplete="new-password" :disabled="managerBusy" class="w-full rounded-lg border border-slate-200 bg-white p-2 text-left" dir="ltr">
+                                        </label>
+                                    </div>
+                                    <button type="submit" :disabled="managerBusy" class="rounded-lg bg-amber-700 px-3 py-2 text-xs font-extrabold text-white disabled:opacity-50" x-text="managerBusy ? 'جارٍ تغيير كلمة المرور...' : 'تغيير كلمة المرور'"></button>
+                                </form>
                                 <details class="rounded-xl border border-slate-200">
                                     <summary class="cursor-pointer px-3 py-2.5 text-xs font-extrabold text-slate-700">إعدادات وإجراءات إضافية</summary>
                                     <div class="space-y-3 border-t border-slate-100 p-3">
@@ -975,7 +1114,7 @@
                             <tbody class="divide-y divide-slate-100">
                                 <template x-for="entry in managerActivityLogs" :key="entry.id">
                                     <tr>
-                                        <td class="p-3 num-en" dir="ltr" x-text="entry.occurredAt ? new Date(entry.occurredAt).toLocaleString(language === 'en' ? 'en-US' : 'ar-EG') : '—'"></td>
+                                        <td class="p-3 num-en" dir="ltr" x-text="entry.occurredAt ? new Date(entry.occurredAt).toLocaleString(getDateTimeLocale()) : '—'"></td>
                                         <td class="p-3" dir="ltr" x-text="entry.actorEmail || entry.actorUid"></td>
                                         <td class="p-3 font-bold" x-text="entry.action"></td>
                                         <td class="p-3" dir="ltr" x-text="entry.collection + (entry.recordId ? ' / ' + entry.recordId : '')"></td>
@@ -1101,22 +1240,23 @@
                     </h4>
                     <p class="mb-2 text-[11px] font-semibold text-slate-500">اسحب الخط لتغيير ترتيبه؛ كل تليفون يضم خطين. الخطوط ذات الرصيد صفر لا تظهر.</p>
                     <div class="max-h-[28rem] overflow-auto rounded-xl border border-blue-100">
-                        <table class="w-full min-w-[600px] text-right text-xs">
+                        <table class="w-full min-w-[760px] text-right text-xs">
                             <thead class="sticky top-0 z-10 bg-blue-50 text-blue-900">
-                                <tr><th class="p-2">التليفون</th><th class="p-2">الخط</th><th class="p-2">الرصيد المتوقع</th><th class="p-2">الرصيد الفعلي</th><th class="p-2">الفرق</th><th class="w-10 p-2 text-center">نقل</th></tr>
+                                <tr><th class="p-2">ترتيب التليفون</th><th class="p-2">اسم الخط</th><th class="p-2">رقم الخط</th><th class="p-2">الرصيد المتوقع</th><th class="p-2">الرصيد الفعلي</th><th class="p-2">الفرق</th><th class="w-10 p-2 text-center">نقل</th></tr>
                             </thead>
                             <tbody class="divide-y divide-blue-50">
                                 <template x-for="row in getClosingWalletRows('line')" :key="row.wallet.id">
                                     <tr @dragover.prevent @drop.prevent="moveClosingWallet(row.wallet.id, 'line')" class="bg-white hover:bg-blue-50/50">
                                         <td class="whitespace-nowrap p-2 font-bold text-blue-800" x-text="'تليفون ' + row.phone"></td>
                                         <td class="p-2 font-bold text-slate-700" x-text="row.wallet.name"></td>
+                                        <td class="p-2 font-bold text-slate-500 num-en" x-text="row.wallet.phone"></td>
                                         <td class="p-2 font-bold text-slate-500 num-en" x-text="formatMoney(row.wallet.balance) + ' ج'"></td>
                                         <td class="p-1.5"><input type="text" inputmode="decimal" x-model="closingInputs.walletBalances[row.wallet.id]" placeholder="الرصيد الفعلي" data-workflow-field class="w-full min-w-32 rounded-lg border border-blue-100 bg-white p-2 font-black text-slate-900 num-en"></td>
                                         <td class="p-2 font-black num-en" :class="getClosingWalletVariance(row.wallet) < 0 ? 'text-rose-600' : 'text-emerald-700'" x-text="formatMoney(getClosingWalletVariance(row.wallet)) + ' ج'"></td>
                                         <td draggable="true" @dragstart="startClosingWalletDrag(row.wallet.id, $event)" class="cursor-grab p-2 text-center text-slate-400 active:cursor-grabbing" title="اسحب لنقل الخط"><i data-lucide="grip-vertical" class="mx-auto h-4 w-4"></i></td>
                                     </tr>
                                 </template>
-                                <tr x-show="getClosingWalletRows('line').length === 0"><td colspan="6" class="p-4 text-center text-slate-500">لا توجد خطوط عليها رصيد.</td></tr>
+                                <tr x-show="getClosingWalletRows('line').length === 0"><td colspan="7" class="p-4 text-center text-slate-500">لا توجد خطوط عليها رصيد.</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -1181,14 +1321,91 @@
                                 </template>
                             </div>
 
-                            <div class="flex justify-end pt-2">
-                                <button @click="approveAndSaveShiftClosing(audit)" data-workflow-submit :disabled="!!getClosingInputError()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-6 py-2.5 rounded-xl shadow-md transition flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50">
-                                    <i data-lucide="save" class="w-4 h-4"></i> اعتماد وتقفيل الشيفت رسمياً
+                            <div class="flex flex-wrap justify-between gap-2 pt-2">
+                                <button @click="approveAndSaveShiftClosing(audit)" data-workflow-submit :disabled="!!getClosingInputError() || closingSaveInProgress" class="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-6 py-2.5 rounded-xl shadow-md transition flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50">
+                                    <i data-lucide="save" class="w-4 h-4"></i> <span x-text="closingSaveInProgress ? 'جارٍ حفظ التقفيلة...' : 'اعتماد وتقفيل الشيفت رسمياً'"></span>
+                                </button>
+                                <button x-show="selectedClosingReportId" @click="openClosingReport(selectedClosingReportId)" class="flex items-center gap-2 rounded-xl bg-blue-700 px-5 py-2.5 font-extrabold text-white shadow-md">
+                                    <i data-lucide="file-bar-chart" class="h-4 w-4"></i> تقرير التقفيلة المعتمدة
                                 </button>
                             </div>
                             <p x-show="getClosingInputError()" x-text="getClosingInputError()" role="alert" class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-bold text-rose-700"></p>
                         </div>
                     </div>
+                </div>
+
+                <div x-show="selectedClosingReport" x-cloak @click.self="selectedClosingReportId = ''" @keydown.escape.window="selectedClosingReportId = ''" class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/70 p-3 sm:p-6">
+                <section id="closingReport" class="relative max-h-[92vh] w-full max-w-6xl space-y-4 overflow-y-auto rounded-2xl border-2 border-blue-200 bg-white p-4 shadow-2xl sm:p-6">
+                    <div class="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-white pb-3">
+                        <div>
+                            <h4 class="flex items-center gap-2 font-extrabold text-slate-900"><i data-lucide="file-bar-chart" class="h-5 w-5 text-blue-700"></i> التقرير الكامل للتقفيلة</h4>
+                            <p class="mt-1 text-xs font-bold text-slate-500" x-text="selectedClosingReport ? getRecordDisplayDateTime(selectedClosingReport) : ''"></p>
+                        </div>
+                        <button @click="selectedClosingReportId = ''" class="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">إغلاق التقرير</button>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-center sm:grid-cols-3 lg:grid-cols-5">
+                        <div class="rounded-xl bg-blue-50 p-3"><span class="block text-[11px] font-bold text-blue-700">الرصيد الافتتاحي</span><strong class="num-en text-blue-900" x-text="formatClosingReportMoney(selectedClosingReport, 'openingBalance')"></strong></div>
+                        <div class="rounded-xl bg-amber-50 p-3"><span class="block text-[11px] font-bold text-amber-700">إجمالي الأرباح</span><strong class="num-en text-amber-900" x-text="formatClosingReportMoney(selectedClosingReport, 'profit')"></strong></div>
+                        <div class="rounded-xl bg-slate-50 p-3"><span class="block text-[11px] font-bold text-slate-600">ربح المكن التقديري</span><strong class="num-en text-slate-900" x-text="formatClosingReportMoney(selectedClosingReport, 'machineProfit')"></strong></div>
+                        <div class="rounded-xl bg-emerald-50 p-3"><span class="block text-[11px] font-bold text-emerald-700">الأصول الفعلية</span><strong class="num-en text-emerald-900" x-text="formatClosingReportMoney(selectedClosingReport, 'totalActualAssets')"></strong></div>
+                        <div class="rounded-xl bg-blue-50 p-3"><span class="block text-[11px] font-bold text-blue-700">إجمالي الأصول المتوقع</span><strong class="num-en text-blue-900" x-text="formatClosingReportMoney(selectedClosingReport, 'totalExpectedAssets')"></strong></div>
+                        <div class="rounded-xl bg-slate-50 p-3"><span class="block text-[11px] font-bold text-slate-600">كاش الدرج المتوقع</span><strong class="num-en text-slate-900" x-text="formatClosingReportMoney(selectedClosingReport, 'expectedDrawer')"></strong></div>
+                        <div class="rounded-xl bg-emerald-50 p-3"><span class="block text-[11px] font-bold text-emerald-700">كاش الدرج الفعلي</span><strong class="num-en text-emerald-900" x-text="formatClosingReportMoney(selectedClosingReport, 'actualDrawer')"></strong></div>
+                        <div class="rounded-xl bg-rose-50 p-3"><span class="block text-[11px] font-bold text-rose-700">صافي ديون العملاء</span><strong class="num-en text-rose-900" x-text="formatClosingReportMoney(selectedClosingReport, 'totalDebts')"></strong></div>
+                        <div class="rounded-xl bg-rose-50 p-3"><span class="block text-[11px] font-bold text-rose-700">العجز / الزيادة</span><strong class="num-en text-rose-900" x-text="formatClosingReportMoney(selectedClosingReport, 'variance')"></strong></div>
+                        <div class="rounded-xl bg-emerald-50 p-3"><span class="block text-[11px] font-bold text-emerald-700">إيداعات العملاء</span><strong class="num-en text-emerald-900" x-text="formatMoney(getClosingReportSummary(selectedClosingReport).depositVolume) + ' ج'"></strong></div>
+                        <div class="rounded-xl bg-rose-50 p-3"><span class="block text-[11px] font-bold text-rose-700">سحوبات العملاء</span><strong class="num-en text-rose-900" x-text="formatMoney(getClosingReportSummary(selectedClosingReport).withdrawVolume) + ' ج'"></strong></div>
+                        <div class="rounded-xl bg-amber-50 p-3"><span class="block text-[11px] font-bold text-amber-700">عمولات العمليات</span><strong class="num-en text-amber-900" x-text="formatMoney(getClosingReportSummary(selectedClosingReport).totalFees) + ' ج'"></strong></div>
+                        <div class="rounded-xl bg-sky-50 p-3"><span class="block text-[11px] font-bold text-sky-700">سندات القبض (داخل)</span><strong class="num-en text-sky-900" x-text="formatMoney(getClosingReportSummary(selectedClosingReport).receiptVouchers) + ' ج'"></strong></div>
+                        <div class="rounded-xl bg-orange-50 p-3"><span class="block text-[11px] font-bold text-orange-700">سندات الصرف (خارج)</span><strong class="num-en text-orange-900" x-text="formatMoney(getClosingReportSummary(selectedClosingReport).paymentVouchers) + ' ج'"></strong></div>
+                        <div class="rounded-xl bg-purple-50 p-3"><span class="block text-[11px] font-bold text-purple-700">عدد العمليات</span><strong class="num-en text-purple-900" x-text="getClosingReportTransactions(selectedClosingReport).length"></strong></div>
+                    </div>
+
+                    <div>
+                        <h5 class="mb-2 font-extrabold text-slate-800">جرد الخطوط والمكن وإنستا باي</h5>
+                        <div class="max-h-72 overflow-auto rounded-xl border border-slate-200">
+                            <table class="w-full min-w-[640px] text-right text-xs">
+                                <thead class="sticky top-0 bg-slate-100 text-slate-600"><tr><th class="p-2">النوع</th><th class="p-2">الاسم</th><th class="p-2">رقم الخط / الحساب</th><th class="p-2">الرصيد المتوقع</th><th class="p-2">الرصيد الفعلي</th><th class="p-2">الفرق</th></tr></thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    <template x-for="item in selectedClosingReport?.walletDetails || []" :key="'closing-wallet-' + item.id">
+                                        <tr><td class="p-2 font-bold" x-text="getWalletCategoryLabel(item.category)"></td><td class="p-2 font-bold" x-text="item.name"></td><td class="p-2 font-bold num-en" x-text="item.phone || getWalletPhone(item.id) || '—'"></td><td class="p-2 num-en" x-text="formatMoney(item.expected) + ' ج'"></td><td class="p-2 num-en" x-text="formatMoney(item.actual) + ' ج'"></td><td class="p-2 font-black num-en" :class="item.variance < 0 ? 'text-rose-600' : 'text-emerald-700'" x-text="formatMoney(item.variance) + ' ج'"></td></tr>
+                                    </template>
+                                    <tr x-show="!selectedClosingReport?.walletDetails?.length"><td colspan="6" class="p-4 text-center text-slate-500">لا توجد تفاصيل أرصدة محفوظة لهذه التقفيلة.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h5 class="mb-2 font-extrabold text-slate-800">كل عمليات الفترة</h5>
+                        <div class="max-h-80 overflow-auto rounded-xl border border-slate-200">
+                            <table class="w-full min-w-[760px] text-right text-xs">
+                                <thead class="sticky top-0 bg-slate-100 text-slate-600"><tr><th class="p-2">التاريخ والوقت</th><th class="p-2">النوع</th><th class="p-2">الخط</th><th class="p-2">العميل</th><th class="p-2">آخر 3 أرقام</th><th class="p-2">المبلغ</th><th class="p-2">العمولة</th></tr></thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    <template x-for="transaction in getClosingReportTransactions(selectedClosingReport)" :key="'closing-tx-' + transaction.id">
+                                        <tr><td class="p-2 num-en" x-text="getRecordDisplayDateTime(transaction)"></td><td class="p-2" x-text="transaction.type === 'deposit' ? 'إيداع (داخل)' : 'سحب (خارج)'"></td><td class="p-2" x-text="getWalletName(transaction.walletId)"></td><td class="p-2" x-text="transaction.customerName || '-'"></td><td class="p-2 num-en" x-text="transaction.lastThree || '-'"></td><td class="p-2 num-en" x-text="formatMoney(transaction.amount) + ' ج'"></td><td class="p-2 num-en" x-text="formatMoney(transaction.fee) + ' ج'"></td></tr>
+                                    </template>
+                                    <tr x-show="getClosingReportTransactions(selectedClosingReport).length === 0"><td colspan="7" class="p-4 text-center text-slate-500">لا توجد عمليات ضمن فترة هذه التقفيلة.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h5 class="mb-2 font-extrabold text-slate-800">سندات القبض والصرف</h5>
+                        <div class="max-h-64 overflow-auto rounded-xl border border-slate-200">
+                            <table class="w-full min-w-[640px] text-right text-xs">
+                                <thead class="sticky top-0 bg-slate-100 text-slate-600"><tr><th class="p-2">التاريخ والوقت</th><th class="p-2">النوع</th><th class="p-2">العميل</th><th class="p-2">السبب / الملاحظة</th><th class="p-2">المبلغ</th></tr></thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    <template x-for="voucher in getClosingReportVouchers(selectedClosingReport)" :key="'closing-voucher-' + voucher.id">
+                                        <tr><td class="p-2 num-en" x-text="getRecordDisplayDateTime(voucher)"></td><td class="p-2" x-text="voucher.type === 'receipt' ? 'قبض (داخل)' : 'صرف (خارج)'"></td><td class="p-2" x-text="getCustomerName(voucher.customerId)"></td><td class="p-2" x-text="voucher.notes || '-'"></td><td class="p-2 num-en" x-text="formatMoney(voucher.amount) + ' ج'"></td></tr>
+                                    </template>
+                                    <tr x-show="getClosingReportVouchers(selectedClosingReport).length === 0"><td colspan="5" class="p-4 text-center text-slate-500">لا توجد سندات ضمن فترة هذه التقفيلة.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
                 </div>
 
                 <!-- PAST CLOSINGS HISTORY TABLE -->
@@ -1221,6 +1438,7 @@
                                         <td class="p-2 text-center">
                                             <div class="flex justify-center gap-2">
                                                 <button @click="editClosingRecord(c)" class="text-blue-700 hover:text-blue-900 bg-blue-50 px-2 py-1 rounded flex items-center gap-1" title="فتح التقفيلة للتعديل"><i data-lucide="edit" class="w-3.5 h-3.5"></i><span>تعديل</span></button>
+                                                <button @click="openClosingReport(c.id)" class="text-emerald-700 hover:text-emerald-900 bg-emerald-50 px-2 py-1 rounded flex items-center gap-1" title="عرض تقرير التقفيلة"><i data-lucide="file-bar-chart" class="w-3.5 h-3.5"></i><span>تقرير</span></button>
                                                 <button @click="deleteClosingRecord(c.id)" class="text-rose-600 hover:text-rose-800" title="حذف التقفيلة"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
                                             </div>
                                         </td>
@@ -1292,9 +1510,9 @@
                             </button>
                         </div>
                         <div class="overflow-x-auto">
-                            <table class="w-full min-w-[560px] text-right text-xs">
+                            <table class="w-full min-w-[600px] text-right text-xs">
                                 <thead class="bg-slate-50 text-slate-600">
-                                    <tr><th class="p-2">الاسم</th><th class="p-2">رقم الهاتف</th><th class="p-2">النوع</th><th class="p-2">الرصيد</th><th class="p-2">بيانات التسجيل</th><th class="p-2 text-center">إجراءات</th></tr>
+                                    <tr><th class="p-2">الاسم</th><th class="p-2">رقم الهاتف</th><th class="p-2">النوع</th><th x-show="category === 'line'" class="p-2">حالة الخط</th><th class="p-2">الرصيد</th><th class="p-2">بيانات التسجيل</th><th class="p-2 text-center">إجراءات</th></tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-100">
                                     <template x-for="w in getWalletsByCategory(category)" :key="w.id">
@@ -1302,6 +1520,9 @@
                                             <td class="p-2 text-slate-900" x-text="w.name"></td>
                                             <td class="p-2 text-slate-700 num-en" x-text="w.phone || '-'"></td>
                                             <td class="p-2"><span class="rounded bg-slate-100 px-2 py-0.5 text-[10px] text-slate-700" x-text="w.type"></span></td>
+                                            <td x-show="category === 'line'" class="p-2">
+                                                <button @click="toggleWalletOperational(w)" :class="isWalletOperational(w) ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' : 'bg-rose-100 text-rose-800 hover:bg-rose-200'" class="rounded-full px-2.5 py-1 text-[10px] font-extrabold" x-text="isWalletOperational(w) ? 'شغال' : 'متوقف'"></button>
+                                            </td>
                                             <td class="p-2 font-black text-emerald-700 num-en" x-text="formatMoney(w.balance) + ' ج'"></td>
                                             <td class="p-2 text-slate-500" x-text="[w.nationalId, w.birthDate].filter(Boolean).join(' • ') || '-'"></td>
                                             <td class="p-2">
@@ -1312,7 +1533,7 @@
                                             </td>
                                         </tr>
                                     </template>
-                                    <tr x-show="getWalletsByCategory(category).length === 0"><td colspan="6" class="p-4 text-center text-slate-500" x-text="'لا توجد ' + getWalletCategoryLabel(category) + ' مضافة.'"></td></tr>
+                                    <tr x-show="getWalletsByCategory(category).length === 0"><td :colspan="category === 'line' ? 7 : 6" class="p-4 text-center text-slate-500" x-text="'لا توجد ' + getWalletCategoryLabel(category) + ' مضافة.'"></td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -1591,10 +1812,10 @@
                     <h3 class="font-extrabold text-slate-800 text-base flex items-center gap-2">
                         <i data-lucide="smartphone" class="w-5 h-5 text-blue-600"></i> تقرير عمليات وأرباح الخط
                     </h3>
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
                         <label class="text-xs font-bold text-slate-600">الخط / المحفظة
                             <select x-model="walletReportFilter.walletId" class="mt-1 w-full bg-white border border-slate-300 rounded-xl p-2 text-xs">
-                                <option value="">اختر الخط</option>
+                                <option value="">كل الخطوط</option>
                                 <template x-for="w in wallets" :key="'report-' + w.id"><option :value="w.id" x-text="w.name + ' (' + w.phone + ')' "></option></template>
                             </select>
                         </label>
@@ -1603,6 +1824,9 @@
                         </label>
                         <label class="text-xs font-bold text-slate-600">إلى تاريخ
                             <input type="date" x-model="walletReportFilter.toDate" class="mt-1 w-full bg-white border border-slate-300 rounded-xl p-2 text-xs">
+                        </label>
+                        <label class="text-xs font-bold text-slate-600">آخر 3 أرقام للعميل
+                            <input type="text" inputmode="numeric" maxlength="3" x-model="walletReportFilter.lastThree" placeholder="مثال: 123" class="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2 text-xs num-en">
                         </label>
                         <button @click="generateWalletReport()" class="self-end bg-blue-600 hover:bg-blue-700 text-white font-bold p-2 rounded-xl text-xs flex items-center justify-center gap-1">
                             <i data-lucide="search" class="w-4 h-4"></i> عرض التقرير
@@ -1613,7 +1837,7 @@
                         <div class="bg-emerald-50 p-3 rounded-xl border border-emerald-200"><span class="text-xs text-emerald-700 block">إيداعات العميل</span><strong class="num-en" x-text="formatMoney(walletReportResult.depositVolume) + ' ج'"></strong></div>
                         <div class="bg-rose-50 p-3 rounded-xl border border-rose-200"><span class="text-xs text-rose-700 block">سحوبات العميل</span><strong class="num-en" x-text="formatMoney(walletReportResult.withdrawVolume) + ' ج'"></strong></div>
                         <div class="bg-amber-50 p-3 rounded-xl border border-amber-200"><span class="text-xs text-amber-700 block">إجمالي العمولة</span><strong class="num-en" x-text="formatMoney(walletReportResult.totalFees) + ' ج'"></strong></div>
-                        <div class="bg-blue-50 p-3 rounded-xl border border-blue-200"><span class="text-xs text-blue-700 block">الرصيد الحالي</span><strong class="num-en" x-text="formatMoney(getWalletBalance(walletReportFilter.walletId)) + ' ج'"></strong></div>
+                        <div x-show="walletReportFilter.walletId" class="bg-blue-50 p-3 rounded-xl border border-blue-200"><span class="text-xs text-blue-700 block">الرصيد الحالي للخط</span><strong class="num-en" x-text="formatMoney(getWalletBalance(walletReportFilter.walletId)) + ' ج'"></strong></div>
                     </div>
                     <div class="overflow-x-auto max-h-96">
                         <table class="w-full text-right text-xs">
@@ -1819,7 +2043,7 @@
             <div class="flex justify-between items-center border-b border-slate-100 pb-2">
                 <div>
                     <h3 class="font-black text-slate-900 text-base" x-text="'كشف حساب العميل: ' + selectedCustomer.name"></h3>
-                    <p class="text-xs text-slate-500 font-bold num-en" x-text="'رقم الهاتف: ' + selectedCustomer.phone"></p>
+                    <p class="text-xs text-slate-500 font-bold num-en" x-text="'رقم الهاتف: ' + (selectedCustomer.phone || '—')"></p>
                 </div>
                 <div class="text-left">
                     <span class="text-xs text-slate-500 font-bold block">رصيد الحساب الحرج:</span>
@@ -1885,9 +2109,30 @@
             'إدارة الكاش والخدمات': 'Cash & Services Management',
             'إدارة المحافظ والكاش': 'Wallet & Cash Management',
             'إعدادات الفروع': 'Branch Settings',
+            'اختر الفرع وأدخل بيانات حسابك': 'Select a branch and enter your account details',
+            'تفاصيل الخطأ': 'Error Details',
             'الأجهزة المتصلة: ': 'Connected devices: ',
             'الوضع النهاري': 'Light mode',
             'الوضع الليلي': 'Dark mode',
+            'الحد الشهري': 'Monthly limit',
+            'الحد اليومي': 'Daily limit',
+            'انتظر التحقق من وقت الخادم.': 'Waiting for server-time verification.',
+            'ترتيب التليفون': 'Phone order',
+            'ربح المكن التقديري': 'Estimated machine profit',
+            'رقم الخط / الحساب': 'Line / account number',
+            'لا توجد عمليات ضمن فترة هذه التقفيلة.': 'No transactions in this closing period.',
+            'لا توجد سندات ضمن فترة هذه التقفيلة.': 'No vouchers in this closing period.',
+            'حالة الخط': 'Line status',
+            'الرصيد الحالي للخط': 'Current line balance',
+            'مكن': 'Machine',
+            'خط': 'Line',
+            'فودافون كاش': 'Vodafone Cash',
+            'فوري': 'Fawry',
+            'بساطة': 'Basata',
+            'باي ناو': 'PayNow',
+            'أخرى': 'Other',
+            'سحب (كاش)': 'Cash withdrawal',
+            'محفظة محذوفة': 'Deleted wallet',
             'تسجيل الخروج': 'Sign out',
             'تسجيل الدخول': 'Sign in',
             'لوحة الإدارة': 'Admin Dashboard',
@@ -1920,6 +2165,20 @@
             'إعادة المحاولة': 'Retry',
             'جاري إعادة الاتصال...': 'Reconnecting...',
             'إدارة الفروع وحساباتها': 'Manage Branches and Accounts',
+            'الحساب وكلمة المرور': 'Account & Password',
+            'بيانات الحساب وتغيير كلمة المرور': 'Account Details & Change Password',
+            'الحساب المسجل حاليًا:': 'Currently signed-in account:',
+            'كلمة المرور القديمة': 'Current Password',
+            'كلمة المرور الجديدة (6 أحرف على الأقل)': 'New Password (at least 6 characters)',
+            'تأكيد كلمة المرور الجديدة': 'Confirm New Password',
+            'التحقق وتغيير كلمة المرور': 'Verify & Change Password',
+            'تم تغيير كلمة مرور الحساب المسجل بنجاح.': 'The signed-in account password was changed successfully.',
+            'أدخل كلمة المرور القديمة والجديدة للحساب المسجل.': 'Enter the current and new passwords for the signed-in account.',
+            'كلمة المرور الجديدة يجب ألا تقل عن 6 أحرف.': 'The new password must be at least 6 characters.',
+            'تأكيد كلمة المرور الجديدة غير مطابق.': 'The new password confirmation does not match.',
+            'اختر كلمة مرور جديدة مختلفة عن القديمة.': 'Choose a new password that differs from the current password.',
+            'الحساب المسجل تغيّر. سجّل الدخول مجددًا ثم حاول مرة أخرى.': 'The signed-in account changed. Sign in again and retry.',
+            'كلمة المرور مخفية ولا تُحفظ؛ يتم تغييرها بعد تسجيل الدخول بالحساب نفسه.': 'Passwords are hidden and not stored. Change a password after signing in to that account.',
             'الفروع المسجلة': 'Registered Branches',
             'إضافة فرع جديد': 'Add a Branch',
             'اسم الفرع': 'Branch Name',
@@ -2231,6 +2490,30 @@
             'إجمالي الأصول الفعلية:': 'Total Actual Assets:',
             'نتيجة المطابقة بعد إضافة صافي ديون العملاء:': 'Reconciliation after Net Customer Debts:',
             'اعتماد وتقفيل الشيفت رسمياً': 'Confirm and Close Shift',
+            'جارٍ حفظ التقفيلة...': 'Saving closing...',
+            'تقرير التقفيلة المعتمدة': 'Approved Closing Report',
+            'التقرير الكامل للتقفيلة': 'Full Closing Report',
+            'إغلاق التقرير': 'Close Report',
+            'الرصيد الافتتاحي': 'Opening Balance',
+            'إجمالي الأرباح': 'Total Profit',
+            'الأصول الفعلية': 'Actual Assets',
+            'إجمالي الأصول المتوقع': 'Total Expected Assets',
+            'كاش الدرج المتوقع': 'Expected Cash Drawer',
+            'كاش الدرج الفعلي': 'Actual Cash Drawer',
+            'صافي ديون العملاء': 'Net Customer Debts',
+            'العجز / الزيادة': 'Shortage / Surplus',
+            'إيداعات العملاء': 'Customer Deposits',
+            'سحوبات العملاء': 'Customer Withdrawals',
+            'عمولات العمليات': 'Transaction Fees',
+            'سندات القبض (داخل)': 'Receipt Vouchers (In)',
+            'سندات الصرف (خارج)': 'Payment Vouchers (Out)',
+            'جرد الخطوط والمكن وإنستا باي': 'Lines, Machines & InstaPay Inventory',
+            'كل عمليات الفترة': 'All Transactions in Period',
+            'سندات القبض والصرف': 'Receipt & Payment Vouchers',
+            'الاسم / الرقم': 'Name / Number',
+            'لا توجد تفاصيل أرصدة محفوظة لهذه التقفيلة.': 'No saved balance details for this closing.',
+            'لا توجد عمليات محفوظة ضمن هذه التقفيلة.': 'No transactions saved for this closing.',
+            'لا توجد سندات محفوظة ضمن هذه التقفيلة.': 'No vouchers saved for this closing.',
             'أدخل النقدية الفعلية بالدرج قبل اعتماد التقفيل.': 'Enter the actual cash drawer balance before closing.',
             'أرشيف التقفيلات والشيفتات السابقة': 'Closing & Shift History',
             'التاريخ والوقت': 'Date & Time',
@@ -2447,7 +2730,22 @@
             'تفاصيل عمليات الفترة': 'Period Transaction Details',
             'تقرير عمليات وأرباح الخط': 'Line Transactions & Profit Report',
             'الخط / المحفظة': 'Line / Wallet',
+            'كل الخطوط': 'All Lines',
+            'آخر 3 أرقام للعميل': 'Customer Last 3 Digits',
+            'مثال: 123': 'Example: 123',
             'آخر أرقام': 'Last Digits',
+            'استهلاك الخط — شهريًا (حد 200,000 ج):': 'Line usage — monthly (limit 200,000 EGP):',
+            'المتبقي شهريًا:': 'Monthly remaining:',
+            'استخدام اليوم (حد 60,000 ج):': 'Today’s usage (limit 60,000 EGP):',
+            'المتاح اليوم:': 'Available today:',
+            'انتظر التحقق من وقت الخادم قبل استخدام الخط.': 'Wait for server time verification before using this line.',
+            'وصل الخط إلى الحد المتاح؛ لا يمكن تسجيل إيداع إضافي الآن.': 'This line has reached its available limit; no additional deposit can be recorded.',
+            'وصل الخط إلى الحد المتاح؛ لا يمكن تسجيل سحب إضافي الآن.': 'This line has reached its available limit; no additional withdrawal can be recorded.',
+            'المبلغ المدخل يتجاوز المتاح لهذا الخط؛ لا يمكن تسجيل الإيداع.': 'The entered amount exceeds the available line limit; the deposit cannot be recorded.',
+            'المبلغ المدخل يتجاوز المتاح لهذا الخط؛ لا يمكن تسجيل السحب.': 'The entered amount exceeds the available line limit; the withdrawal cannot be recorded.',
+            'الاستهلاك يجمع الإيداع والسحب على الخط نفسه؛ يتجدد الحد اليومي كل يوم والشهري مع بداية الشهر.': 'Usage combines deposits and withdrawals on the same line. The daily limit resets each day and the monthly limit resets at the start of the month.',
+            'تعذر التحقق من وقت الخادم؛ لا يمكن اعتماد حد الخط قبل استعادة المزامنة.': 'Could not verify server time. Line limits cannot be enforced until synchronization is restored.',
+            'تعذر حفظ التقفيلة في Firebase. لم يتم اعتمادها؛ راجع الاتصال وحاول مرة أخرى.': 'Could not save the closing to Firebase. It was not approved; check the connection and retry.',
             'إدارة النسخ الاحتياطي للسيستم': 'System Backup Management',
             'إدارة الفروع وحساباتها': 'Manage Branches and Accounts',
             'إدارة الفروع والحسابات والنسخ الاحتياطي من مكان واحد. لكل فرع إعداد مستقل لإظهار أرباح الشيفت أو تمويهها أو إخفائها عن المستخدم العادي.': 'Manage branches, accounts, and backups from one place. Each branch has separate settings to show, blur, or hide shift profits from regular users.',
@@ -2693,7 +2991,6 @@
                 firebaseSyncStatus: 'غير متصل',
                 firebaseSyncVersion: 0,
                 firebaseUnsubscribe: null,
-
                 // SYSTEM DATA
                 masterOpeningBalance: 30000,
                 drawerOpeningBalance: 0,
@@ -2729,6 +3026,8 @@
                 // SHIFT CLOSING INPUTS
                 closingInputs: { actualDrawerCash: null, walletBalances: {}, machineProfit: '' },
                 closingDraggedWalletId: null,
+                selectedClosingReportId: '',
+                closingSaveInProgress: false,
 
                 // MODAL STATES & FORMS
                 showWalletModal: false,
@@ -2748,7 +3047,7 @@
 
                 reportFilter: { fromDate: '', toDate: '' },
                 reportResult: { totalFees: 0, depositVolume: 0, withdrawVolume: 0, count: 0, receiptVouchers: 0, paymentVouchers: 0 },
-                walletReportFilter: { walletId: '', fromDate: '', toDate: '' },
+                walletReportFilter: { walletId: '', fromDate: '', toDate: '', lastThree: '' },
                 walletReportResult: { totalFees: 0, depositVolume: 0, withdrawVolume: 0, count: 0 },
 
                 receiptData: {},
@@ -2852,6 +3151,27 @@
                             [/^تم إنشاء الفرع "(.+)" وربط حسابه\. كلمة المرور لم تُحفظ في قاعدة البيانات\.$/, 'Created branch "$1" and linked its account. The password was not saved to the database.'],
                             [/^تم تحديث بيانات الفرع\. تأكد أن البريد المستخدم لتسجيل الدخول يحتوي على كلمة تمييز البريد الجديدة\.$/, 'Branch details updated. Make sure the sign-in email contains the new branch keyword.'],
                             [/^تم إيقاف الفرع "(.+)"\. بياناته محفوظة وغير متاحة لحسابه\.$/, 'Branch "$1" was disabled. Its data is retained and unavailable to its account.'],
+                            [/^محفظة محذوفة$/, 'Deleted wallet'],
+                            [/^إدارة الكاش والخدمات\s*•\s*في انتظار التحقق من وقت الخادم$/, 'Cash & Services Management • Waiting for server-time verification'],
+                            [/^عجز:\s*(.+)\sج$/, 'Shortage: $1 EGP'],
+                            [/^زيادة:\s*(.+)\sج$/, 'Surplus: $1 EGP'],
+                            [/^فارق الدرج:\s*(.+)\sج$/, 'Drawer variance: $1 EGP'],
+                            [/^فارق المكن:\s*(.+)\sج$/, 'Machine variance: $1 EGP'],
+                            [/^فارق إنستا باي:\s*(.+)\sج$/, 'InstaPay variance: $1 EGP'],
+                            [/^فارق الخطوط:\s*(.+)\sج$/, 'Lines variance: $1 EGP'],
+                            [/^إجمالي الأصول الفعلية:\s*(.+)\sج$/, 'Total actual assets: $1 EGP'],
+                            [/^نتيجة المطابقة بعد إضافة صافي ديون العملاء:\s*(.+)\sج$/, 'Reconciliation after net customer debts: $1 EGP'],
+                            [/^رقم الهاتف:\s*(.+)$/, 'Phone number: $1'],
+                            [/^(\d+)\s*عنصر$/, '$1 item(s)'],
+                            [/^المبلغ يتجاوز المتاح للخط اليوم \((.+) ج\)\. الحد اليومي 60,000 ج والشهري 200,000 ج\.$/, 'The amount exceeds the available line limit today ($1 EGP). Daily limit: 60,000 EGP; monthly limit: 200,000 EGP.'],
+                            [/^(\d+)\s+فرع محدد$/, '$1 branch(es) selected'],
+                            [/^الخطوط:\s*(\d+)$/, 'Lines: $1'],
+                            [/^العمليات:\s*(\d+)$/, 'Transactions: $1'],
+                            [/^السندات:\s*(\d+)$/, 'Vouchers: $1'],
+                            [/^التقفيلات:\s*(\d+)$/, 'Closings: $1'],
+                            [/^(.+)\sج \(له فلوس\)$/, '$1 EGP (customer owes)'],
+                            [/^Cash & Services Management • في انتظار التحقق من وقت الخادم$/, 'Cash & Services Management • Waiting for server-time verification'],
+                            [/^تاريخ التقفيل: في انتظار التحقق من وقت الخادم$/, 'Closing date: Waiting for server-time verification'],
                             [/^إدارة الكاش والخدمات\s*•\s*/, 'Cash & Services Management • '],
                             [/^إدارة الكاش والخدمات$/, 'Cash & Services Management'],
                             [/^(\d+)\s*عملية$/, '$1 transaction(s)'],
@@ -2879,6 +3199,26 @@
                             [/^Created branch "(.+)" and linked its account\. The password was not saved to the database\.$/, 'تم إنشاء الفرع "$1" وربط حسابه. كلمة المرور لم تُحفظ في قاعدة البيانات.'],
                             [/^Branch details updated\. Make sure the sign-in email contains the new branch keyword\.$/, 'تم تحديث بيانات الفرع. تأكد أن البريد المستخدم لتسجيل الدخول يحتوي على كلمة تمييز البريد الجديدة.'],
                             [/^Branch "(.+)" was disabled\. Its data is retained and unavailable to its account\.$/, 'تم إيقاف الفرع "$1". بياناته محفوظة وغير متاحة لحسابه.'],
+                            [/^Deleted wallet$/, 'محفظة محذوفة'],
+                            [/^Cash & Services Management • Waiting for server-time verification$/, 'إدارة الكاش والخدمات • في انتظار التحقق من وقت الخادم'],
+                            [/^Shortage:\s*(.+)\sEGP$/, 'عجز: $1 ج'],
+                            [/^Surplus:\s*(.+)\sEGP$/, 'زيادة: $1 ج'],
+                            [/^Drawer variance:\s*(.+)\sEGP$/, 'فارق الدرج: $1 ج'],
+                            [/^Machine variance:\s*(.+)\sEGP$/, 'فارق المكن: $1 ج'],
+                            [/^InstaPay variance:\s*(.+)\sEGP$/, 'فارق إنستا باي: $1 ج'],
+                            [/^Lines variance:\s*(.+)\sEGP$/, 'فارق الخطوط: $1 ج'],
+                            [/^Total actual assets:\s*(.+)\sEGP$/, 'إجمالي الأصول الفعلية: $1 ج'],
+                            [/^Reconciliation after net customer debts:\s*(.+)\sEGP$/, 'نتيجة المطابقة بعد إضافة صافي ديون العملاء: $1 ج'],
+                            [/^Phone number:\s*(.+)$/, 'رقم الهاتف: $1'],
+                            [/^(\d+)\s*item\(s\)$/, '$1 عنصر'],
+                            [/^(\d+)\s+branch\(es\) selected$/, '$1 فرع محدد'],
+                            [/^Lines:\s*(\d+)$/, 'الخطوط: $1'],
+                            [/^Transactions:\s*(\d+)$/, 'العمليات: $1'],
+                            [/^Vouchers:\s*(\d+)$/, 'السندات: $1'],
+                            [/^Closings:\s*(\d+)$/, 'التقفيلات: $1'],
+                            [/^(.+)\sEGP \(customer owes\)$/, '$1 ج (له فلوس)'],
+                            [/^Cash & Services Management • Waiting for server-time verification$/, 'إدارة الكاش والخدمات • في انتظار التحقق من وقت الخادم'],
+                            [/^Closing date: Waiting for server-time verification$/, 'تاريخ التقفيل: في انتظار التحقق من وقت الخادم'],
                             [/^Cash & Services Management\s*•\s*/, 'إدارة الكاش والخدمات • '],
                             [/^Cash & Services Management$/, 'إدارة الكاش والخدمات'],
                             [/^(\d+)\s*transaction\(s\)$/, '$1 عملية'],
@@ -2965,7 +3305,7 @@
                 },
 
                 applyLanguage(language) {
-                    document.documentElement.lang = language;
+                    document.documentElement.lang = language === 'en' ? 'en' : 'ar-EG-u-nu-latn';
                     document.documentElement.dir = language === 'en' ? 'ltr' : 'rtl';
                     document.documentElement.classList.toggle('english-mode', language === 'en');
                     this.translateLanguageSubtree(document.body, language);
@@ -3565,13 +3905,40 @@
                 async loadManagedBranches() {
                     this.stopManagedBranchWatchers();
                     const branches = await this.firebaseService.listBranchAccounts();
-                    const branchSettings = await Promise.all(branches.map(branch => this.firebaseService.getBranchSettings(branch.id)));
+                    const branchSettings = await Promise.all(
+                        branches.map(branch => this.firebaseService.getBranchSettings(branch.id))
+                    );
+                    const branchIdsNeedingEmail = branches
+                        .filter(branch => branch.account?.uid && !branch.account.email)
+                        .map(branch => branch.id);
+                    const emailBatches = [];
+                    for (let index = 0; index < branchIdsNeedingEmail.length; index += 100) {
+                        emailBatches.push(branchIdsNeedingEmail.slice(index, index + 100));
+                    }
+                    let accountEmails = {};
+                    if (emailBatches.length) {
+                        try {
+                            const emailResults = await Promise.all(
+                                emailBatches.map(batch => this.firebaseService.getBranchAccountEmails(batch))
+                            );
+                            accountEmails = Object.assign({}, ...emailResults);
+                        } catch (error) {
+                            this.managerError = `تعذر تحميل بعض عناوين حسابات الفروع: ${this.describeFirebaseError(error)}`;
+                            console.error('Branch account email lookup failed:', error);
+                        }
+                    }
                     this.managedBranches = branches.map((branch, index) => ({
                         ...branch,
+                        account: branch.account ? {
+                            ...branch.account,
+                            email: branch.account.email || accountEmails[branch.id] || ''
+                        } : null,
                         dailyFeesVisibility: branchSettings[index].dailyFeesVisibility,
                         activeDevices: 0,
                         devices: [],
                         backupSelected: false,
+                        passwordDraft: '',
+                        passwordConfirmDraft: '',
                         announcementDraft: branch.announcement?.message || ''
                     }));
                     this.firebaseBranches = await this.firebaseService.getPublicBranches();
@@ -4012,7 +4379,7 @@
                         return;
                     }
                     const options = { timeZone: 'Africa/Cairo' };
-                    const locale = this.language === 'en' ? 'en-US' : 'ar-EG';
+                    const locale = this.getDateTimeLocale();
                     this.currentDateStr = now.toLocaleDateString(locale, {
                         ...options,
                         year: 'numeric',
@@ -4111,7 +4478,7 @@
                 getRecordDisplayDateTime(record) {
                     const date = this.getRecordDateObject(record);
                     return date
-                        ? date.toLocaleString(this.language === 'en' ? 'en-US' : 'ar-EG', {
+                        ? date.toLocaleString(this.getDateTimeLocale(), {
                             timeZone: 'Africa/Cairo',
                             year: 'numeric',
                             month: '2-digit',
@@ -4121,6 +4488,10 @@
                             hour12: true
                         })
                         : String(record?.datetime || '—');
+                },
+
+                getDateTimeLocale() {
+                    return this.language === 'en' ? 'en-US' : 'ar-EG-u-nu-latn';
                 },
 
                 getLocalDateTimeInput(record) {
@@ -4208,11 +4579,15 @@
                 },
 
                 get walletReportTransactions() {
-                    const { walletId, fromDate, toDate } = this.walletReportFilter;
-                    if (!walletId) return [];
+                    const { walletId, fromDate, toDate, lastThree } = this.walletReportFilter;
+                    const targetLastThree = String(lastThree || '').replace(/\D/g, '').slice(-3);
                     return this.transactions.filter(t => {
                         const date = this.getRecordDateTime(t).slice(0, 10);
-                        return t.walletId === walletId && (!fromDate || date >= fromDate) && (!toDate || date <= toDate);
+                        const transactionLastThree = String(t.lastThree || '').replace(/\D/g, '').slice(-3);
+                        return (!walletId || t.walletId === walletId)
+                            && (!fromDate || date >= fromDate)
+                            && (!toDate || date <= toDate)
+                            && (!targetLastThree || transactionLastThree === targetLastThree);
                     }).sort((a, b) => this.compareRecordsNewestFirst(a, b));
                 },
 
@@ -4225,6 +4600,10 @@
 
                 get sortedClosingHistory() {
                     return [...this.closingHistory].sort((a, b) => this.compareRecordsNewestFirst(a, b));
+                },
+
+                get selectedClosingReport() {
+                    return this.closingHistory.find(record => record.id === this.selectedClosingReportId) || null;
                 },
 
                 get selectedBackupBranchIds() {
@@ -4481,6 +4860,33 @@
                     this.currentMode = 'cashier';
                 },
 
+                async changeManagedBranchPassword(branch) {
+                    if (!this.managerSettingsUnlocked || !branch?.account?.uid || this.managerBusy) return;
+                    const password = String(branch.passwordDraft || '');
+                    if (password.length < 6) {
+                        this.managerError = 'كلمة مرور الفرع يجب ألا تقل عن 6 أحرف.';
+                        return;
+                    }
+                    if (password !== branch.passwordConfirmDraft) {
+                        this.managerError = 'تأكيد كلمة مرور الفرع غير مطابق.';
+                        return;
+                    }
+                    this.managerBusy = true;
+                    this.managerError = '';
+                    this.managerStatus = '';
+                    try {
+                        await this.firebaseService.setBranchAccountPassword(branch.id, password);
+                        this.managerStatus = `تم تغيير كلمة مرور حساب فرع "${branch.name}" بنجاح.`;
+                    } catch (error) {
+                        this.managerError = this.describeFirebaseError(error);
+                        console.error(`Branch password update for ${branch.name} failed:`, error);
+                    } finally {
+                        branch.passwordDraft = '';
+                        branch.passwordConfirmDraft = '';
+                        this.managerBusy = false;
+                    }
+                },
+
                 async recordActivity(action) {
                     if (!this.currentBranch || !this.firebaseService || !this.firebaseUser) return;
                     try {
@@ -4507,7 +4913,86 @@
                 getCashierWalletLabel(type) {
                     const form = type === 'deposit' ? this.cashierDeposit : this.cashierWithdraw;
                     const wallet = this.wallets.find(item => item.id === form.walletId);
-                    return wallet ? `${wallet.name} (${wallet.phone})` : '';
+                    return wallet ? `${wallet.name} (${wallet.phone})${this.getWalletCategory(wallet) === 'line' ? ` • ${this.isWalletOperational(wallet) ? 'شغال' : 'متوقف'}` : ''}` : '';
+                },
+
+                getCashierWalletStatusClass(type) {
+                    const form = type === 'deposit' ? this.cashierDeposit : this.cashierWithdraw;
+                    const wallet = this.wallets.find(item => item.id === form.walletId);
+                    if (!wallet || this.getWalletCategory(wallet) !== 'line') return '';
+                    return this.isWalletOperational(wallet)
+                        ? 'border-emerald-500 ring-1 ring-emerald-100'
+                        : 'border-rose-500 ring-1 ring-rose-100';
+                },
+
+                getCashierLimitSummary(type) {
+                    const form = type === 'deposit' ? this.cashierDeposit : this.cashierWithdraw;
+                    const wallet = this.wallets.find(item => item.id === form.walletId);
+                    if (!wallet || this.getWalletCategory(wallet) !== 'line') {
+                        return { applies: false, exceeded: false };
+                    }
+
+                    const now = this.getTrustedNow();
+                    if (!now) {
+                        return {
+                            applies: true,
+                            ready: false,
+                            exceeded: true,
+                            monthlyUsed: 0,
+                            monthlyRemaining: 0,
+                            monthlyPercent: 0,
+                            dailyUsed: 0,
+                            dailyAvailable: 0,
+                            dailyPercent: 0
+                        };
+                    }
+
+                    const today = this.getLocalDateString(now);
+                    const currentMonth = today.slice(0, 7);
+                    const monthlyUsed = this.transactions.reduce((sum, transaction) => {
+                        const date = this.getRecordDateTime(transaction).slice(0, 10);
+                        return transaction.walletId === wallet.id && transaction.type === 'withdraw' && date.startsWith(currentMonth)
+                            ? sum + Math.max(0, Number(transaction.amount) || 0)
+                            : sum;
+                    }, 0);
+                    const dailyUsed = this.transactions.reduce((sum, transaction) => {
+                        return transaction.walletId === wallet.id && transaction.type === 'withdraw' && this.getRecordDateTime(transaction).slice(0, 10) === today
+                            ? sum + Math.max(0, Number(transaction.amount) || 0)
+                            : sum;
+                    }, 0);
+                    const monthlyRemaining = Math.max(0, 200000 - monthlyUsed);
+                    const dailyAvailable = Math.max(0, Math.min(60000 - dailyUsed, monthlyRemaining));
+                    const amount = Math.max(0, Number(form.amount) || 0);
+                    return {
+                        applies: true,
+                        ready: true,
+                        exceeded: dailyAvailable <= 0 || (amount > 0 && amount > dailyAvailable),
+                        monthlyUsed,
+                        monthlyRemaining,
+                        monthlyPercent: Math.min(100, (monthlyUsed / 200000) * 100),
+                        dailyUsed,
+                        dailyAvailable,
+                        dailyPercent: Math.min(100, (dailyUsed / 60000) * 100)
+                    };
+                },
+
+                isCashierAmountOverLimit(type) {
+                    const form = type === 'deposit' ? this.cashierDeposit : this.cashierWithdraw;
+                    const summary = this.getCashierLimitSummary(type);
+                    return summary.applies && (!summary.ready || (
+                        Number(form.amount) > 0 && Number(form.amount) > summary.dailyAvailable
+                    ));
+                },
+
+                getCashierLimitError(type, amount) {
+                    const summary = this.getCashierLimitSummary(type);
+                    if (!summary.applies) return '';
+                    if (!summary.ready) return 'تعذر التحقق من وقت الخادم؛ لا يمكن اعتماد حد الخط قبل استعادة المزامنة.';
+                    const value = Number(amount) || 0;
+                    if (value > summary.dailyAvailable) {
+                        return `المبلغ يتجاوز المتاح للخط اليوم (${this.formatMoney(summary.dailyAvailable)} ج). الحد اليومي 60,000 ج والشهري 200,000 ج.`;
+                    }
+                    return '';
                 },
 
                 getFilteredCashierWallets(type) {
@@ -4662,6 +5147,10 @@
                     const form = type === 'deposit' ? this.cashierDeposit : this.cashierWithdraw;
                     if (!this.pendingCashierTransaction && !form.walletId) return alert('برجاء اختيار المحفظة أولاً');
                     if (!this.pendingCashierTransaction && (!form.amount || form.amount <= 0)) return alert('برجاء إدخال مبلغ صحيح');
+                    if (!this.pendingCashierTransaction) {
+                        const limitError = this.getCashierLimitError(type, form.amount);
+                        if (limitError) return alert(limitError);
+                    }
 
                     let tx;
                     if (this.pendingCashierTransaction) {
@@ -4889,6 +5378,10 @@
                     return this.wallets.filter(wallet => this.getWalletCategory(wallet) === category);
                 },
 
+                isWalletOperational(wallet) {
+                    return wallet.operational !== false;
+                },
+
                 getOrderedWallets(category) {
                     return this.getWalletsByCategory(category)
                         .map((wallet, sourceIndex) => ({ wallet, sourceIndex }))
@@ -4913,6 +5406,64 @@
                     return this.getOrderedWallets(category)
                         .filter(wallet => Number(wallet.balance || 0) !== 0)
                         .map((wallet, index) => ({ wallet, phone: Math.floor(index / 2) + 1 }));
+                },
+
+                formatClosingReportMoney(record, field) {
+                    const value = record?.[field];
+                    return value === null || value === undefined || value === '' || !Number.isFinite(Number(value))
+                        ? '—'
+                        : `${this.formatMoney(value)} ج`;
+                },
+
+                getClosingReportSummary(record) {
+                    const transactions = this.getClosingReportTransactions(record);
+                    const vouchers = this.getClosingReportVouchers(record);
+                    return {
+                        depositVolume: transactions.filter(item => item.type === 'deposit')
+                            .reduce((sum, item) => sum + Number(item.amount || 0), 0),
+                        withdrawVolume: transactions.filter(item => item.type === 'withdraw')
+                            .reduce((sum, item) => sum + Number(item.amount || 0), 0),
+                        totalFees: transactions.reduce((sum, item) => sum + Number(item.fee || 0), 0),
+                        receiptVouchers: vouchers.filter(item => item.type === 'receipt')
+                            .reduce((sum, item) => sum + Number(item.amount || 0), 0),
+                        paymentVouchers: vouchers.filter(item => item.type === 'payment')
+                            .reduce((sum, item) => sum + Number(item.amount || 0), 0)
+                    };
+                },
+
+                getClosingReportTransactions(record) {
+                    if (!record) return [];
+                    if (Array.isArray(record.transactions)) return record.transactions;
+                    const records = this.sortedClosingHistory;
+                    const index = records.findIndex(item => item.id === record.id);
+                    if (index < 0) return [];
+                    const previousClosing = records[index + 1] || null;
+                    return this.transactions
+                        .filter(transaction => this.isRecordAfterClosing(transaction, previousClosing)
+                            && !this.isRecordAfterClosing(transaction, record))
+                        .sort((a, b) => this.compareRecordsNewestFirst(a, b));
+                },
+
+                getClosingReportVouchers(record) {
+                    if (!record) return [];
+                    if (Array.isArray(record.vouchers)) return record.vouchers;
+                    const records = this.sortedClosingHistory;
+                    const index = records.findIndex(item => item.id === record.id);
+                    if (index < 0) return [];
+                    const previousClosing = records[index + 1] || null;
+                    return this.vouchers
+                        .filter(voucher => this.isRecordAfterClosing(voucher, previousClosing)
+                            && !this.isRecordAfterClosing(voucher, record))
+                        .sort((a, b) => this.compareRecordsNewestFirst(a, b));
+                },
+
+                getWalletPhone(id) {
+                    return this.wallets.find(wallet => wallet.id === id)?.phone || '';
+                },
+
+                openClosingReport(id) {
+                    this.selectedClosingReportId = id;
+                    this.$nextTick(() => document.getElementById('closingReport')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
                 },
 
                 getClosingWalletVariance(wallet) {
@@ -5039,7 +5590,7 @@
                             expectedMachineAssets += exp;
                             actualMachineAssets += act;
                         }
-                        walletDetails.push({ id: w.id, name: w.name, type: w.type, category, expected: exp, actual: act, variance: varVal });
+                        walletDetails.push({ id: w.id, name: w.name, phone: w.phone || '', type: w.type, category, expected: exp, actual: act, variance: varVal });
                     });
 
                     actualMachineAssets = Math.round(actualMachineAssets * 100) / 100;
@@ -5080,11 +5631,15 @@
                     };
                 },
 
-                approveAndSaveShiftClosing(audit) {
+                async approveAndSaveShiftClosing(audit) {
+                    if (this.closingSaveInProgress) return;
                     if (this.getClosingInputError()) return alert(this.getClosingInputError());
                     const actualDrawer = this.parseClosingExpression(this.closingInputs.actualDrawerCash);
                     if (actualDrawer === null) return alert('برجاء إدخال كاش الدرج الفعلي أولاً');
 
+                    const previousClosing = this.getLatestClosingRecord();
+                    const shiftTransactions = this.transactions.filter(transaction => this.isRecordAfterClosing(transaction, previousClosing));
+                    const shiftVouchers = this.vouchers.filter(voucher => this.isRecordAfterClosing(voucher, previousClosing));
                     const closingRecord = {
                         id: 'close_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
                         datetime: this.getNowDateTimeString(),
@@ -5097,6 +5652,8 @@
                         totalExpectedAssets: audit.totalExpectedAssets,
                         totalDebts: audit.totalDebts,
                         variance: audit.variance,
+                        transactions: shiftTransactions.map(transaction => ({ ...transaction })),
+                        vouchers: shiftVouchers.map(voucher => ({ ...voucher })),
                         walletInputs: Object.fromEntries(audit.walletDetails.map(item => [item.id, item.actual])),
                         walletDetails: audit.walletDetails.map(item => ({ ...item }))
                     };
@@ -5111,11 +5668,27 @@
 
                     this.masterOpeningBalance = audit.totalActualAssets + audit.totalDebts;
 
+                    this.closingSaveInProgress = true;
+                    let saved = false;
+                    try {
+                        saved = await this.saveAllData();
+                    } finally {
+                        this.closingSaveInProgress = false;
+                    }
+                    if (!saved) {
+                        this.closingHistory = this.closingHistory.filter(record => record.id !== closingRecord.id);
+                        audit.walletDetails.forEach(item => {
+                            const wallet = this.wallets.find(existing => existing.id === item.id);
+                            if (wallet) wallet.balance = Number(item.expected);
+                        });
+                        this.masterOpeningBalance = Number(closingRecord.openingBalance || 0);
+                        return alert('تعذر حفظ التقفيلة في Firebase. لم يتم اعتمادها؛ راجع الاتصال وحاول مرة أخرى.');
+                    }
+
                     this.closingInputs.actualDrawerCash = null;
                     this.closingInputs.walletBalances = {};
                     this.closingInputs.machineProfit = '';
-
-                    this.saveAllData();
+                    this.selectedClosingReportId = closingRecord.id;
                     alert('تم اعتماد وتقفيل الشيفت بنجاح!');
                 },
 
@@ -5123,6 +5696,7 @@
                     if (confirm('هل أنت متأكد من حذف هذا التقفيل؟')) {
                         const deletedRecord = this.closingHistory.find(record => record.id === id);
                         this.closingHistory = this.closingHistory.filter(c => c.id !== id);
+                        if (this.selectedClosingReportId === id) this.selectedClosingReportId = '';
                         this.closingHistory.sort((a, b) => this.compareRecordsNewestFirst(a, b));
                         if (this.closingHistory.length > 0) {
                             const latest = this.closingHistory[0];
@@ -5216,6 +5790,12 @@
                     this.editingWalletId = w.id;
                     this.walletForm = { ...w, category: this.getWalletCategory(w) };
                     this.showWalletModal = true;
+                },
+
+                toggleWalletOperational(wallet) {
+                    if (this.getWalletCategory(wallet) !== 'line') return;
+                    wallet.operational = !this.isWalletOperational(wallet);
+                    this.saveAllData();
                 },
 
                 saveWallet() {

@@ -52,6 +52,10 @@ firebase deploy --only functions
 
 The recipient is configured as `sayedyassersy1@gmail.com` in `functions/index.js`. Email delivery is asynchronous and depends on SMTP provider availability; Firestore activity records remain the source of truth if delivery fails.
 
+## Change a branch account password
+
+The system manager can set a new password from **إعدادات الفروع** without knowing the old password. The app does not display or store branch passwords. This uses authenticated callable Cloud Functions, so install the existing function dependencies and deploy functions with `firebase deploy --only functions` after confirming the SMTP secrets above are configured. Publish `index.html` and `firebase.js` as well. A successful password change revokes the branch account's refresh tokens; sign that account in again on its devices.
+
 ## Operational checks
 
 - Test with a non-production branch and a non-sensitive test transaction first.
@@ -62,6 +66,9 @@ The recipient is configured as `sayedyassersy1@gmail.com` in `functions/index.js
 - Toggle night mode on and off, then reload the page to confirm the appearance choice is retained on that device.
 - Switch to English and back to Arabic, reload, and confirm the selected language and page direction are retained.
 - Confirm that a branch account cannot read another branch's data and that the system manager can export all branch snapshots.
+- Confirm that only the system manager can retrieve branch account emails or set a branch password, and verify that the changed password works after signing in again.
+- Mark a test line as stopped and verify it is red in cashier selection, then mark it as working and verify it is green. Confirm the monthly limit resets by month and is based on withdrawals, while both cashier forms enforce the available line limit.
+- Approve a test shift closing and verify its popup includes the line numbers, transactions, vouchers, deposits, withdrawals, fees, balances, and profit figures.
 - From system manager settings, disable one online device for a test branch and confirm its app locks after the update; re-enable it and confirm it can sign in again.
 - Confirm that the manager can enable/disable branch accounts, change the branch-admin page permission, send/clear announcements, and review activity.
 - Confirm that emails arrive and inspect Cloud Function logs for SMTP failures.
