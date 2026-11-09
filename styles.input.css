@@ -1,0 +1,447 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body { font-family: 'Cairo', sans-serif; }
+        html.english-mode body { direction: ltr; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+        html.english-mode [class~="text-right"] { text-align: left !important; }
+        .num-en { direction: ltr; font-family: system-ui, -apple-system, sans-serif; font-variant-numeric: lining-nums tabular-nums; font-weight: 700; unicode-bidi: isolate; }
+        .cashier-limit-card[data-cashier-workflow] { position: relative; isolation: isolate; padding-top: 3.5rem; }
+        .cashier-limit-ribbon {
+            position: absolute;
+            z-index: 20;
+            top: -.625rem;
+            right: 1rem;
+            display: flex;
+            width: min(600px, calc(100% - 2rem));
+            max-width: calc(100% - 2rem);
+            align-items: stretch;
+            border: 1px solid #dbe7f3;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, .98);
+            padding: 13px 20px;
+            box-shadow: 0 8px 20px rgba(30, 55, 90, .12);
+            backdrop-filter: blur(12px);
+        }
+        html.english-mode .cashier-limit-ribbon { right: auto; left: 1rem; }
+        .cashier-limit-group { min-width: 0; flex: 1 1 0%; }
+        .cashier-limit-group b.num-en { font-size: 10px; font-weight: 800; }
+        .cashier-limit-separator {
+            width: 1px;
+            flex: 0 0 1px;
+            align-self: stretch;
+            margin: 2px 12px;
+            background: linear-gradient(transparent, #cbd5e1 18%, #cbd5e1 82%, transparent);
+        }
+        .cashier-limit-progress { height: 3px; overflow: hidden; border-radius: 9999px; background: #eef2f7; }
+        .cashier-limit-progress > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #f87171, #e11d48); transition: width .25s ease; }
+        @media (max-width: 420px) {
+            .cashier-limit-ribbon { right: .75rem; width: calc(100% - 1.5rem); max-width: calc(100% - 1.5rem); padding: 10px 8px; }
+            html.english-mode .cashier-limit-ribbon { right: auto; left: .75rem; }
+            .cashier-limit-group { font-size: 9px; }
+            .cashier-limit-group b.num-en { font-size: 9px; }
+            .cashier-limit-separator { margin-right: 7px; margin-left: 7px; }
+        }
+        [x-cloak] { display: none !important; }
+        input[type="number"] {
+            appearance: textfield;
+            -moz-appearance: textfield;
+        }
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            margin: 0;
+            -webkit-appearance: none;
+        }
+        .splash-screen {
+            position: fixed;
+            inset: 0;
+            z-index: 1200;
+            display: grid;
+            place-items: center;
+            overflow: hidden;
+            color: #15243a;
+            background: #ffffff;
+            transition: opacity .3s ease, visibility .3s ease;
+        }
+        .splash-screen::before,
+        .splash-screen::after {
+            position: absolute;
+            width: min(76vw, 680px);
+            aspect-ratio: 1;
+            content: "";
+            border: 1px solid rgba(30, 64, 100, .035);
+            border-radius: 50%;
+        }
+        .splash-screen::after {
+            width: min(58vw, 510px);
+            border-color: rgba(30, 64, 100, .03);
+        }
+        .splash-screen.is-leaving {
+            visibility: hidden;
+            opacity: 0;
+            pointer-events: none;
+        }
+        .splash-content {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            width: min(90vw, 560px);
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+        .splash-brand {
+            position: relative;
+            margin: 0;
+            color: #15243a;
+            font-family: 'Cairo', 'Segoe UI', sans-serif;
+            font-size: clamp(2.8rem, 10vw, 5.5rem);
+            font-weight: 800;
+            line-height: 1.15;
+            letter-spacing: .015em;
+            text-shadow: 0 8px 28px rgba(21, 75, 110, .13);
+        }
+        .splash-brand span {
+            display: inline-block;
+            color: transparent;
+            background: linear-gradient(110deg, #173b59 0%, #286b8a 38%, #a9eef4 50%, #286b8a 62%, #173b59 100%);
+            background-size: 220% 100%;
+            background-position: 100% 50%;
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: splash-water-shimmer 1s ease-in-out both;
+        }
+        @keyframes splash-water-shimmer {
+            from { background-position: 100% 50%; }
+            to { background-position: 0% 50%; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .splash-brand span {
+                animation-duration: .01ms !important;
+                animation-iteration-count: 1 !important;
+            }
+        }
+        body.bg-slate-50 {
+            background:
+                radial-gradient(ellipse at 8% 0%, rgba(191, 219, 254, .24), transparent 34rem),
+                #f4f7fb;
+            color: #172033;
+        }
+        header.bg-white {
+            background: rgba(255, 255, 255, .94);
+            border-color: #e4eaf3;
+            box-shadow: 0 8px 28px rgba(30, 55, 90, .07);
+            backdrop-filter: blur(14px);
+        }
+        .branch-mark {
+            background: linear-gradient(145deg, #2563eb, #0f3f91);
+            box-shadow: 0 8px 18px rgba(37, 99, 235, .2);
+        }
+        main > div > .bg-white.rounded-2xl,
+        main > div > .grid > .bg-white,
+        main > div > .bg-white.rounded-xl {
+            box-shadow: 0 8px 26px rgba(30, 55, 90, .045);
+        }
+        .bg-white.rounded-xl,
+        .bg-white.rounded-2xl {
+            border-color: #e7edf5;
+        }
+        button {
+            transition: background-color .18s ease, border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+        }
+        button:hover:not(:disabled) {
+            transform: translateY(-1px);
+        }
+        button:focus-visible,
+        input:focus-visible,
+        select:focus-visible,
+        textarea:focus-visible {
+            outline: 3px solid rgba(59, 130, 246, .22);
+            outline-offset: 2px;
+        }
+        input:not([type="checkbox"]):not([type="radio"]),
+        select,
+        textarea {
+            border-color: #dce4ef;
+            transition: border-color .18s ease, box-shadow .18s ease, background-color .18s ease;
+        }
+        input:not([type="checkbox"]):not([type="radio"]):focus,
+        select:focus,
+        textarea:focus {
+            border-color: #60a5fa;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, .12);
+            outline: none;
+        }
+        thead.bg-slate-100 {
+            background: #f3f6fa;
+        }
+        tbody tr {
+            transition: background-color .15s ease;
+        }
+        .firebase-login-overlay {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            min-height: 100vh;
+            min-height: 100dvh;
+            box-sizing: border-box;
+            isolation: isolate;
+            overflow: auto;
+            padding: clamp(16px, 4vw, 36px);
+            background:
+                radial-gradient(ellipse at 12% 15%, rgba(96, 165, 250, .23), transparent 34%),
+                radial-gradient(ellipse at 88% 86%, rgba(45, 212, 191, .17), transparent 32%),
+                linear-gradient(145deg, #f8fbff 0%, #edf4ff 48%, #f5f8ff 100%) !important;
+            background-size: 140% 140%;
+            animation: login-background-drift 14s ease-in-out infinite alternate;
+            backdrop-filter: blur(8px);
+        }
+        @keyframes login-background-drift {
+            from { background-position: 0% 0%; }
+            to { background-position: 100% 100%; }
+        }
+        .firebase-login-card {
+            position: relative;
+            max-height: calc(100dvh - 32px);
+            overflow-y: auto;
+            border: 1px solid rgba(255, 255, 255, .86);
+            background: rgba(255, 255, 255, .94);
+            box-shadow: 0 32px 90px rgba(35, 67, 117, .17), 0 8px 24px rgba(35, 67, 117, .08);
+            animation: login-card-enter .82s cubic-bezier(.16, 1, .3, 1) both;
+            transform-origin: 50% 70%;
+            backdrop-filter: blur(18px);
+        }
+        @keyframes login-card-enter {
+            0% { opacity: 0; transform: translateY(36px) scale(.92) rotateX(8deg); filter: blur(8px); }
+            65% { opacity: 1; transform: translateY(-5px) scale(1.012) rotateX(0); filter: blur(0); }
+            100% { transform: translateY(0) scale(1); }
+        }
+        .login-form > * {
+            animation: login-item-enter .55s cubic-bezier(.2, .8, .2, 1) both;
+        }
+        .login-form > *:nth-child(1) { animation-delay: .08s; }
+        .login-form > *:nth-child(2) { animation-delay: .13s; }
+        .login-form > *:nth-child(3) { animation-delay: .18s; }
+        .login-form > *:nth-child(4) { animation-delay: .23s; }
+        .login-form > *:nth-child(5) { animation-delay: .28s; }
+        .login-form > *:nth-child(6) { animation-delay: .33s; }
+        @keyframes login-item-enter {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .login-brand-mark {
+            display: grid;
+            width: 52px;
+            height: 52px;
+            margin: 0 auto 12px;
+            place-items: center;
+            border-radius: 18px;
+            color: white;
+            background: linear-gradient(145deg, #3b82f6, #1d4ed8 62%, #0f3f91);
+            box-shadow: 0 12px 24px rgba(37, 99, 235, .24);
+        }
+        .login-brand-mark svg {
+            width: 24px;
+            height: 24px;
+        }
+        .login-credentials {
+            display: grid;
+            gap: 12px;
+        }
+        .login-options {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        .login-manager-contact {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            padding-top: 2px;
+            color: #64748b;
+            font-size: .8rem;
+            font-weight: 700;
+        }
+        .login-manager-contact a {
+            color: #15803d;
+            text-decoration: none;
+        }
+        .login-manager-contact a:hover {
+            color: #166534;
+            text-decoration: underline;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .firebase-login-overlay,
+            .firebase-login-card,
+            .login-form > * {
+                animation-duration: .01ms !important;
+                animation-iteration-count: 1 !important;
+            }
+        }
+        .firebase-error-notice {
+            border: 1px solid #fecaca;
+            border-radius: 12px;
+            background: #fff7f7;
+            padding: 11px 13px;
+            color: #b42318;
+            line-height: 1.7;
+            text-align: right;
+        }
+        .firebase-login-card button[type="submit"],
+        .firebase-login-card > button {
+            background: #2563eb;
+            box-shadow: 0 8px 18px rgba(37, 99, 235, .16);
+        }
+        .firebase-login-card button[type="submit"]:hover,
+        .firebase-login-card > button:hover {
+            background: #1d4ed8;
+        }
+        .bg-slate-900,
+        .bg-slate-800 {
+            background-color: #1d4ed8;
+        }
+        .hover\:bg-slate-900:hover,
+        .hover\:bg-slate-800:hover {
+            background-color: #1e40af;
+        }
+        /* Scrollbar styling */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #edf2f8; }
+        ::-webkit-scrollbar-thumb { background: #c4cfdd; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        @media print {
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+        }
+        html.dark-mode,
+        html.dark-mode body {
+            background: #0b1220 !important;
+            color: #e2e8f0 !important;
+        }
+        html.dark-mode body.bg-slate-50 {
+            background: radial-gradient(ellipse at 8% 0%, rgba(30, 64, 120, .2), transparent 34rem), #0b1220 !important;
+        }
+        html.dark-mode header.bg-white,
+        html.dark-mode [class~="bg-white"] {
+            background-color: #111c2f !important;
+            color: #e2e8f0;
+        }
+        html.dark-mode [class~="bg-slate-50"],
+        html.dark-mode [class~="bg-gray-50"] {
+            background-color: #172338 !important;
+        }
+        html.dark-mode [class~="bg-slate-100"],
+        html.dark-mode [class~="bg-gray-100"] {
+            background-color: #1d2b42 !important;
+        }
+        html.dark-mode [class~="bg-slate-200"],
+        html.dark-mode [class~="bg-gray-200"] {
+            background-color: #293950 !important;
+        }
+        html.dark-mode [class~="text-slate-900"],
+        html.dark-mode [class~="text-slate-800"],
+        html.dark-mode [class~="text-slate-700"],
+        html.dark-mode [class~="text-gray-900"],
+        html.dark-mode [class~="text-gray-800"],
+        html.dark-mode [class~="text-gray-700"] {
+            color: #e2e8f0 !important;
+        }
+        html.dark-mode [class~="text-slate-600"],
+        html.dark-mode [class~="text-slate-500"],
+        html.dark-mode [class~="text-slate-400"],
+        html.dark-mode [class~="text-gray-600"],
+        html.dark-mode [class~="text-gray-500"] {
+            color: #a8b6ca !important;
+        }
+        html.dark-mode [class*="border-slate-"],
+        html.dark-mode [class*="border-gray-"] {
+            border-color: #2a3a52 !important;
+        }
+        html.dark-mode [class~="bg-blue-50"],
+        html.dark-mode [class~="bg-sky-50"],
+        html.dark-mode [class~="bg-indigo-50"],
+        html.dark-mode [class~="bg-emerald-50"],
+        html.dark-mode [class~="bg-green-50"],
+        html.dark-mode [class~="bg-rose-50"],
+        html.dark-mode [class~="bg-red-50"],
+        html.dark-mode [class~="bg-amber-50"],
+        html.dark-mode [class~="bg-yellow-50"],
+        html.dark-mode [class~="bg-violet-50"],
+        html.dark-mode [class~="bg-purple-50"],
+        html.dark-mode [class~="bg-orange-50"],
+        html.dark-mode [class~="bg-cyan-50"],
+        html.dark-mode [class~="bg-teal-50"],
+        html.dark-mode [class~="bg-fuchsia-50"],
+        html.dark-mode [class~="bg-pink-50"],
+        html.dark-mode [class~="bg-lime-50"] {
+            background-color: #1b2a40 !important;
+        }
+        html.dark-mode [class~="bg-emerald-100"],
+        html.dark-mode [class~="bg-green-100"],
+        html.dark-mode [class~="bg-blue-100"],
+        html.dark-mode [class~="bg-sky-100"],
+        html.dark-mode [class~="bg-indigo-100"],
+        html.dark-mode [class~="bg-rose-100"],
+        html.dark-mode [class~="bg-red-100"],
+        html.dark-mode [class~="bg-amber-100"],
+        html.dark-mode [class~="bg-orange-100"],
+        html.dark-mode [class~="bg-violet-100"],
+        html.dark-mode [class~="bg-purple-100"],
+        html.dark-mode [class~="bg-cyan-100"],
+        html.dark-mode [class~="bg-teal-100"],
+        html.dark-mode [class~="bg-yellow-100"],
+        html.dark-mode [class~="bg-fuchsia-100"],
+        html.dark-mode [class~="bg-pink-100"] {
+            background-color: #263750 !important;
+        }
+        html.dark-mode [class*="text-emerald-"],
+        html.dark-mode [class*="text-green-"] { color: #6ee7b7 !important; }
+        html.dark-mode [class*="text-blue-"] { color: #93c5fd !important; }
+        html.dark-mode [class*="text-rose-"],
+        html.dark-mode [class*="text-red-"] { color: #fda4af !important; }
+        html.dark-mode [class*="text-amber-"],
+        html.dark-mode [class*="text-orange-"] { color: #fcd34d !important; }
+        html.dark-mode [class*="text-violet-"],
+        html.dark-mode [class*="text-purple-"],
+        html.dark-mode [class*="text-indigo-"],
+        html.dark-mode [class*="text-fuchsia-"],
+        html.dark-mode [class*="text-pink-"] { color: #c4b5fd !important; }
+        html.dark-mode [class*="text-cyan-"],
+        html.dark-mode [class*="text-teal-"] { color: #67e8f9 !important; }
+        html.dark-mode [class*="text-sky-"] { color: #7dd3fc !important; }
+        html.dark-mode [class*="text-yellow-"],
+        html.dark-mode [class*="text-lime-"] { color: #fde68a !important; }
+        html.dark-mode [class*="from-"][class*="to-"] {
+            background-image: none !important;
+            background-color: #111c2f !important;
+        }
+        html.dark-mode input:not([type="checkbox"]):not([type="radio"]),
+        html.dark-mode select,
+        html.dark-mode textarea {
+            background-color: #172338 !important;
+            color: #e2e8f0 !important;
+            border-color: #354760 !important;
+            color-scheme: dark;
+        }
+        html.dark-mode input::placeholder,
+        html.dark-mode textarea::placeholder { color: #8494aa !important; }
+        html.dark-mode thead.bg-slate-100 { background: #1d2b42 !important; }
+        html.dark-mode tbody tr:hover { background-color: #172338; }
+        html.dark-mode .firebase-login-overlay {
+            background: linear-gradient(145deg, #0b1220, #14243a 55%, #101a2c) !important;
+        }
+        html.dark-mode .firebase-login-card { background: rgba(17, 28, 47, .96) !important; }
+        html.dark-mode .cashier-limit-ribbon {
+            border-color: #354760 !important;
+            background: rgba(17, 28, 47, .98) !important;
+        }
+        html.dark-mode .cashier-limit-progress { background: #293950 !important; }
+        html.dark-mode .cashier-limit-separator { background: linear-gradient(transparent, #52647e 18%, #52647e 82%, transparent); }
+        html.dark-mode .splash-screen { background: #0b1220; color: #e2e8f0; }
+        html.dark-mode .splash-brand { color: #e2e8f0; }
+        html.dark-mode ::-webkit-scrollbar-track { background: #111c2f; }
+        html.dark-mode ::-webkit-scrollbar-thumb { background: #40516a; }
