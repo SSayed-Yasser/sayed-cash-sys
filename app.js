@@ -2,6 +2,34 @@ const APP_TRANSLATIONS = {
             'إدارة الكاش والخدمات': 'Cash & Services Management',
             'إدارة المحافظ والكاش': 'Wallet & Cash Management',
             'إعدادات الفروع': 'Branch Settings',
+            'إدارة أذكى لكل يوم': 'Smarter management, every day',
+            'نظام سما فون لإدارة الكاش والمحافظ': 'Sama Phone Cash & Wallet Management System',
+            'كل عملياتك وأرصدة خطوطك في مكان واحد، بوضوح وسهولة.': 'All your transactions and line balances in one clear, easy-to-use place.',
+            'متابعة لحظية': 'Live tracking',
+            'حسابات أدق': 'More accurate accounting',
+            'إدارة أسهل': 'Easier management',
+            'تطوير': 'Developed by',
+            'جاري تهيئة النظام...': 'Initializing the system...',
+            'جاري الاتصال بقاعدة البيانات...': 'Connecting to the database...',
+            'جاري تحميل بيانات الفروع...': 'Loading branch data...',
+            'جاري تحميل إعدادات الفروع...': 'Loading branch settings...',
+            'جاري تحميل بيانات الفرع...': 'Loading branch data...',
+            'جاري تجهيز البيانات...': 'Preparing data...',
+            'رسالة عامة من الإدارة — لكل الفروع': 'Message from management — all branches',
+            'سؤال من الإدارة — مطلوب رد الفرع': 'Question from management — branch response required',
+            'تم تسجيل إجابة الفرع: نعم': 'Branch response recorded: Yes',
+            'تم تسجيل إجابة الفرع: لا': 'Branch response recorded: No',
+            'إجابة واحدة عن الفرع كله:': 'One response for this branch:',
+            'رسالة عامة لكل الفروع': 'Global message for all branches',
+            'تظهر أعلى رسالة الفرع الفردية بلون أحمر.': 'Displayed in red above the branch-specific message.',
+            'إرسال لكل الفروع': 'Send to all branches',
+            'حذف الرسالة العامة': 'Clear global message',
+            'سؤال بنعم أو لا لكل الفروع': 'Yes-or-no question for all branches',
+            'كل إجابة جديدة تستبدل الإجابات السابقة على السؤال الجديد.': 'A new question replaces the previous question and responses.',
+            'إرسال السؤال للجميع': 'Send question to all branches',
+            'رد الفرع على آخر سؤال عام': 'Branch response to the latest global question',
+            'لم يتم إرسال سؤال عام بعد.': 'No global question has been sent yet.',
+            'بانتظار الرد': 'Awaiting response',
             'اختر الفرع وأدخل بيانات حسابك': 'Select a branch and enter your account details',
             'تفاصيل الخطأ': 'Error Details',
             'الأجهزة المتصلة: ': 'Connected devices: ',
@@ -831,6 +859,11 @@ const APP_TRANSLATIONS = {
                 currentBranch: null,
                 dataOwnerBranchId: null,
                 branchAnnouncementDismissedId: '',
+                globalAnnouncementDismissedId: '',
+                globalAnnouncementForm: '',
+                globalPollForm: '',
+                globalPollResponseBusy: false,
+                globalPollResponseError: '',
                 activeDeviceCount: 0,
                 deviceUnsubscribe: null,
                 deviceBlocked: false,
@@ -931,7 +964,9 @@ const APP_TRANSLATIONS = {
                 editingCustomerId: null,
                 customerForm: { name: '', phone: '' },
 
-                voucherForm: { type: 'receipt', customerId: '', amount: null, notes: '', datetime: '' },
+                voucherForm: { type: '', customerId: '', amount: null, notes: '', datetime: '' },
+                voucherCustomerSearch: '',
+                voucherCustomerDropdownOpen: false,
                 voucherSearch: '',
 
                 showStatementModal: false,
@@ -1347,7 +1382,7 @@ const APP_TRANSLATIONS = {
                 async initializeFirebase() {
                     try {
                         this.firebaseService = await this.waitForFirebaseService();
-                        window.dismissSamaSplash?.();
+                        window.updateSamaSplashStatus?.('جاري الاتصال بقاعدة البيانات...');
                         try {
                             this.firebaseBranches = await this.firebaseService.getPublicBranches();
                         } catch (error) {
@@ -1373,11 +1408,13 @@ const APP_TRANSLATIONS = {
                                 this.branchAccessUnsubscribe = null;
                                 if (user) {
                                     this.firebaseBusy = true;
+                                    window.updateSamaSplashStatus?.('جاري تحميل بيانات الفروع...');
                                     this.activateFirebaseUser(user).catch(error => {
                                         this.firebaseBusy = false;
                                         if (this.isNetworkFailure(error)) this.markAppOffline();
                                         this.firebaseAuthError = this.describeFirebaseError(error);
                                         this.firebaseSyncStatus = 'تعذرت المزامنة';
+                                        window.dismissSamaSplash?.();
                                     });
                                 } else {
                                     this.firebaseBusy = false;
@@ -1394,16 +1431,19 @@ const APP_TRANSLATIONS = {
                                     this.managerSettingsUnlocked = false;
                                     this.managerBranchesLoaded = false;
                                     this.applyCloudSnapshot({});
+                                    window.dismissSamaSplash?.();
                                 }
                             },
                             error => {
                                 this.firebaseReady = true;
                                 this.firebaseAuthError = this.describeFirebaseError(error);
+                                window.dismissSamaSplash?.();
                             }
                         );
                     } catch (error) {
                         this.firebaseReady = true;
                         this.firebaseAuthError = this.describeFirebaseError(error);
+                        window.dismissSamaSplash?.();
                     }
                 },
 
@@ -1418,6 +1458,7 @@ const APP_TRANSLATIONS = {
                     this.managerSettingsUnlocked = this.isSystemAdmin;
 
                     if (this.isSystemAdmin && this.selectedBranchId === '__manager__') {
+                        window.updateSamaSplashStatus?.('جاري تحميل إعدادات الفروع...');
                         this.dataOwnerBranchId = null;
                         this.currentBranch = null;
                         this.updatePageTitle();
@@ -1431,6 +1472,7 @@ const APP_TRANSLATIONS = {
                         this.firebaseDataReady = true;
                         this.firebaseBusy = false;
                         this.firebaseSyncStatus = 'مدير النظام';
+                        window.dismissSamaSplash?.();
                         return;
                     }
 
@@ -1512,6 +1554,8 @@ const APP_TRANSLATIONS = {
                     this.dataOwnerBranchId = branch.id;
                     this.currentBranch = branch;
                     this.branchAnnouncementDismissedId = '';
+                    this.globalAnnouncementDismissedId = '';
+                    window.updateSamaSplashStatus?.('جاري تحميل بيانات الفرع...');
                     this.updatePageTitle();
                     this.activeDeviceCount = 0;
                     this.applyCloudSnapshot({});
@@ -1556,6 +1600,7 @@ const APP_TRANSLATIONS = {
                         if (legacyTransactionsUnsubscribe) legacyTransactionsUnsubscribe();
                     };
                     const initialSync = await subscription.initialSnapshot;
+                    window.updateSamaSplashStatus?.('جاري تجهيز البيانات...');
                     if (this.firebaseUser?.uid !== user.uid || this.dataOwnerBranchId !== branch.id) {
                         this.firebaseUnsubscribe();
                         this.firebaseUnsubscribe = null;
@@ -1606,6 +1651,7 @@ const APP_TRANSLATIONS = {
                     }
                     this.firebaseDataReady = true;
                     this.firebaseSyncStatus = 'متصل بـ Firebase';
+                    window.dismissSamaSplash?.();
                     if (!this.isSystemAdmin) {
                         this.branchAccessUnsubscribe = this.firebaseService.watchBranchAccess(
                             branch.id,
@@ -1621,6 +1667,7 @@ const APP_TRANSLATIONS = {
                                 this.deviceUnsubscribe = null;
                                 this.branchAccessUnsubscribe = null;
                                 this.applyCloudSnapshot({});
+                                window.dismissSamaSplash?.();
                             },
                             error => {
                                 if (this.isNetworkFailure(error)) this.markAppOffline();
@@ -1638,6 +1685,12 @@ const APP_TRANSLATIONS = {
                 },
 
                 applyCloudSnapshot(snapshot) {
+                    if (this.currentBranch && snapshot.communication) {
+                        this.currentBranch = {
+                            ...this.currentBranch,
+                            communication: snapshot.communication
+                        };
+                    }
                     this.wallets = snapshot.wallets || [];
                     this.transactions = snapshot.transactions || [];
                     this.vouchers = snapshot.vouchers || [];
@@ -1798,9 +1851,10 @@ const APP_TRANSLATIONS = {
                 async loadManagedBranches() {
                     this.stopManagedBranchWatchers();
                     const branches = await this.firebaseService.listBranchAccounts();
-                    const branchSettings = await Promise.all(
-                        branches.map(branch => this.firebaseService.getBranchSettings(branch.id))
-                    );
+                    const [branchSettings, branchCommunications] = await Promise.all([
+                        Promise.all(branches.map(branch => this.firebaseService.getBranchSettings(branch.id))),
+                        Promise.all(branches.map(branch => this.firebaseService.getBranchCommunications(branch.id)))
+                    ]);
                     const branchIdsNeedingEmail = branches
                         .filter(branch => branch.account?.uid && !branch.account.email)
                         .map(branch => branch.id);
@@ -1827,6 +1881,7 @@ const APP_TRANSLATIONS = {
                             email: branch.account.email || accountEmails[branch.id] || ''
                         } : null,
                         dailyFeesVisibility: branchSettings[index].dailyFeesVisibility,
+                        communication: branchCommunications[index],
                         activeDevices: 0,
                         devices: [],
                         backupSelected: false,
@@ -1837,6 +1892,17 @@ const APP_TRANSLATIONS = {
                     this.firebaseBranches = await this.firebaseService.getPublicBranches();
                     this.managerBranchesLoaded = true;
                     this.managedBranches.forEach(branch => {
+                        this.managedBranchUnsubscribers.push(this.firebaseService.watchBranchCommunication(
+                            branch.id,
+                            communication => {
+                                const current = this.managedBranches.find(item => item.id === branch.id);
+                                if (current) current.communication = communication;
+                            },
+                            error => {
+                                this.managerError = this.describeFirebaseError(error);
+                                console.error(`Communication responses for branch ${branch.name} failed:`, error);
+                            }
+                        ));
                         this.managedBranchUnsubscribers.push(this.firebaseService.watchBranchDeviceList(
                             branch.id,
                             devices => {
@@ -1945,6 +2011,108 @@ const APP_TRANSLATIONS = {
                         this.managerError = this.describeFirebaseError(error);
                     } finally {
                         this.managerBusy = false;
+                    }
+                },
+
+                async publishGlobalAnnouncement() {
+                    if (!this.managerSettingsUnlocked || this.managerBusy) return;
+                    const message = this.globalAnnouncementForm.trim();
+                    if (!message) {
+                        this.managerError = 'اكتب الرسالة العامة أولاً.';
+                        return;
+                    }
+                    this.managerBusy = true;
+                    this.managerError = '';
+                    this.managerStatus = '';
+                    try {
+                        const branchIds = this.managedBranches.map(branch => branch.id);
+                        const announcement = await this.firebaseService.publishGlobalAnnouncement(branchIds, message);
+                        this.managedBranches.forEach(branch => {
+                            branch.communication = {
+                                ...(branch.communication || {}),
+                                globalAnnouncement: announcement
+                            };
+                        });
+                        this.globalAnnouncementForm = '';
+                        this.managerStatus = `تم إرسال الرسالة العامة إلى ${branchIds.length} فرع.`;
+                    } catch (error) {
+                        this.managerError = `تعذر إرسال الرسالة العامة: ${this.describeFirebaseError(error)}`;
+                    } finally {
+                        this.managerBusy = false;
+                    }
+                },
+
+                async clearGlobalAnnouncement() {
+                    if (!this.managerSettingsUnlocked || this.managerBusy) return;
+                    this.managerBusy = true;
+                    this.managerError = '';
+                    this.managerStatus = '';
+                    try {
+                        const branchIds = this.managedBranches.map(branch => branch.id);
+                        await this.firebaseService.clearGlobalAnnouncement(branchIds);
+                        this.managedBranches.forEach(branch => {
+                            branch.communication = { ...(branch.communication || {}), globalAnnouncement: null };
+                        });
+                        this.managerStatus = `تم حذف الرسالة العامة من ${branchIds.length} فرع.`;
+                    } catch (error) {
+                        this.managerError = `تعذر حذف الرسالة العامة: ${this.describeFirebaseError(error)}`;
+                    } finally {
+                        this.managerBusy = false;
+                    }
+                },
+
+                async publishGlobalPoll() {
+                    if (!this.managerSettingsUnlocked || this.managerBusy) return;
+                    const question = this.globalPollForm.trim();
+                    if (!question) {
+                        this.managerError = 'اكتب السؤال أولاً.';
+                        return;
+                    }
+                    this.managerBusy = true;
+                    this.managerError = '';
+                    this.managerStatus = '';
+                    try {
+                        const branchIds = this.managedBranches.map(branch => branch.id);
+                        const poll = await this.firebaseService.publishGlobalPoll(branchIds, question);
+                        this.managedBranches.forEach(branch => {
+                            branch.communication = {
+                                ...(branch.communication || {}),
+                                globalPoll: poll,
+                                pollResponse: null
+                            };
+                        });
+                        this.globalPollForm = '';
+                        this.managerStatus = `تم إرسال السؤال إلى ${branchIds.length} فرع، وتم تصفير الردود السابقة.`;
+                    } catch (error) {
+                        this.managerError = `تعذر إرسال السؤال: ${this.describeFirebaseError(error)}`;
+                    } finally {
+                        this.managerBusy = false;
+                    }
+                },
+
+                async submitGlobalPollResponse(answer) {
+                    if (!this.currentBranch || this.globalPollResponseBusy) return;
+                    const poll = this.currentBranch.communication?.globalPoll;
+                    if (!poll?.id || !['yes', 'no'].includes(answer)) return;
+                    const previousResponse = this.currentBranch.communication?.pollResponse;
+                    if (previousResponse?.pollId === poll.id) return;
+
+                    this.globalPollResponseBusy = true;
+                    this.globalPollResponseError = '';
+                    try {
+                        const response = { pollId: poll.id, answer, respondedAt: Date.now() };
+                        await this.firebaseService.submitGlobalPollResponse(this.currentBranch.id, poll.id, answer);
+                        this.currentBranch = {
+                            ...this.currentBranch,
+                            communication: {
+                                ...this.currentBranch.communication,
+                                pollResponse: response
+                            }
+                        };
+                    } catch (error) {
+                        this.globalPollResponseError = `تعذر حفظ الإجابة: ${this.describeFirebaseError(error)}`;
+                    } finally {
+                        this.globalPollResponseBusy = false;
                     }
                 },
 
@@ -2321,7 +2489,7 @@ const APP_TRANSLATIONS = {
                 updatePageTitle() {
                     document.title = this.currentBranch?.name
                         ? `${this.currentBranch.name} | ${this.language === 'en' ? 'Cash Management' : 'نظام إدارة الكاش'}`
-                        : this.language === 'en' ? 'Sama Phone | Wallet & Cash Management' : 'Sama Phone | نظام إدارة المحافظ والكاش';
+                        : this.language === 'en' ? 'SAMA PHONE | Wallet & Cash Management' : 'SAMA PHONE | نظام إدارة المحافظ والكاش';
                 },
 
                 getNowDateTimeString() {
@@ -2806,7 +2974,12 @@ const APP_TRANSLATIONS = {
                 getCashierWalletLabel(type) {
                     const form = type === 'deposit' ? this.cashierDeposit : this.cashierWithdraw;
                     const wallet = this.wallets.find(item => item.id === form.walletId);
-                    return wallet ? `${wallet.name} (${wallet.phone})${this.getWalletCategory(wallet) === 'line' ? ` • ${this.isWalletOperational(wallet) ? 'شغال' : 'متوقف'}` : ''}` : '';
+                    if (!wallet) return '';
+                    if (this.getWalletCategory(wallet) !== 'line') return `${wallet.name} (${wallet.phone})`;
+                    if (this.language === 'en') {
+                        return `${wallet.name} (${wallet.phone}) • Balance ${this.formatMoney(wallet.balance || 0)} EGP • ${this.isWalletOperational(wallet) ? 'Active' : 'Inactive'}`;
+                    }
+                    return `${wallet.name} (${wallet.phone}) • رصيد ${this.formatMoney(wallet.balance || 0)} ج • ${this.isWalletOperational(wallet) ? 'شغال' : 'متوقف'}`;
                 },
 
                 getCashierWalletStatusClass(type) {
@@ -2845,7 +3018,7 @@ const APP_TRANSLATIONS = {
                     let monthlyUsed = 0;
                     let dailyUsed = 0;
                     this.transactions.forEach(transaction => {
-                        if (transaction.walletId !== wallet.id || transaction.type !== 'withdraw') return;
+                        if (transaction.walletId !== wallet.id || transaction.type !== type) return;
                         const date = this.getRecordDateTime(transaction).slice(0, 10);
                         if (!date.startsWith(currentMonth)) return;
                         const amount = Math.max(0, Number(transaction.amount) || 0);
@@ -2875,15 +3048,11 @@ const APP_TRANSLATIONS = {
                     ));
                 },
 
-                getCashierLimitError(type, amount) {
+                getCashierLimitError(type) {
                     const summary = this.getCashierLimitSummary(type);
-                    if (!summary.applies) return '';
-                    if (!summary.ready) return 'تعذر التحقق من وقت الخادم؛ لا يمكن اعتماد حد الخط قبل استعادة المزامنة.';
-                    const value = Number(amount) || 0;
-                    if (value > summary.dailyAvailable) {
-                        return `المبلغ يتجاوز المتاح للخط اليوم (${this.formatMoney(summary.dailyAvailable)} ج). الحد اليومي 60,000 ج والشهري 200,000 ج.`;
-                    }
-                    return '';
+                    return summary.applies && !summary.ready
+                        ? 'تعذر التحقق من وقت الخادم؛ لا يمكن اعتماد حد الخط قبل استعادة المزامنة.'
+                        : '';
                 },
 
                 getFilteredCashierWallets(type) {
@@ -2974,6 +3143,12 @@ const APP_TRANSLATIONS = {
                     if (!group) return;
 
                     if (key === 'Enter') {
+                        if (field.dataset.workflowAction === 'voucher-customer') {
+                            event.preventDefault();
+                            const customer = this.getFilteredVoucherCustomers()[0];
+                            if (customer) this.selectVoucherCustomer(customer);
+                            return;
+                        }
                         if (field.dataset.workflowAction === 'voucher') {
                             event.preventDefault();
                             this.saveVoucher();
@@ -3046,7 +3221,7 @@ const APP_TRANSLATIONS = {
                     if (!this.pendingCashierTransaction && !form.walletId) return alert('برجاء اختيار المحفظة أولاً');
                     if (!this.pendingCashierTransaction && (!form.amount || form.amount <= 0)) return alert('برجاء إدخال مبلغ صحيح');
                     if (!this.pendingCashierTransaction) {
-                        const limitError = this.getCashierLimitError(type, form.amount);
+                        const limitError = this.getCashierLimitError(type);
                         if (limitError) return alert(limitError);
                     }
 
@@ -3727,6 +3902,7 @@ const APP_TRANSLATIONS = {
 
                 // VOUCHERS CRUD
                 saveVoucher() {
+                    if (!['receipt', 'payment'].includes(this.voucherForm.type)) return alert('اختر نوع السند');
                     if (!this.voucherForm.customerId) return alert('اختر العميل إجبارياً');
                     if (!this.voucherForm.amount || this.voucherForm.amount <= 0) return alert('أدخل مبلغًا صحيحًا');
                     if (!this.voucherForm.notes) return alert('أدخل السبب/الملاحظة إجبارياً');
@@ -3761,7 +3937,9 @@ const APP_TRANSLATIONS = {
                     const savedCustomer = this.customers.find(item => item.id === saved.customerId);
                     if (savedCustomer) savedCustomer.balance = (savedCustomer.balance || 0) + (saved.type === 'payment' ? 1 : -1) * Number(saved.amount || 0);
                     this.editingVoucherId = null;
-                    this.voucherForm = { type: 'receipt', customerId: '', amount: null, notes: '', datetime: '' };
+                    this.voucherForm = { type: '', customerId: '', amount: null, notes: '', datetime: '' };
+                    this.voucherCustomerSearch = '';
+                    this.voucherCustomerDropdownOpen = false;
                     this.saveAllData();
                     alert(existing ? 'تم حفظ تعديل السند' : 'تم حفظ السند بنجاح!');
                 },
@@ -3775,12 +3953,32 @@ const APP_TRANSLATIONS = {
                         notes: voucher.notes || '',
                         datetime: this.getLocalDateTimeInput(voucher)
                     };
+                    const customer = this.customers.find(item => item.id === voucher.customerId);
+                    this.voucherCustomerSearch = customer ? `${customer.name} (${customer.phone || ''})` : '';
+                    this.voucherCustomerDropdownOpen = false;
                     this.adminTab = 'vouchers';
                 },
 
                 cancelVoucherEdit() {
                     this.editingVoucherId = null;
-                    this.voucherForm = { type: 'receipt', customerId: '', amount: null, notes: '', datetime: '' };
+                    this.voucherForm = { type: '', customerId: '', amount: null, notes: '', datetime: '' };
+                    this.voucherCustomerSearch = '';
+                    this.voucherCustomerDropdownOpen = false;
+                },
+
+                getFilteredVoucherCustomers() {
+                    const query = this.voucherCustomerSearch.trim().toLocaleLowerCase();
+                    if (!query) return this.customers;
+                    return this.customers.filter(customer =>
+                        (customer.name || '').toLocaleLowerCase().includes(query) ||
+                        String(customer.phone || '').toLocaleLowerCase().includes(query)
+                    );
+                },
+
+                selectVoucherCustomer(customer) {
+                    this.voucherForm.customerId = customer.id;
+                    this.voucherCustomerSearch = `${customer.name} (${customer.phone || ''})`;
+                    this.voucherCustomerDropdownOpen = false;
                 },
 
                 calculateVoucherTotals() {

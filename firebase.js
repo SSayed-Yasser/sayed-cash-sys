@@ -62,7 +62,8 @@ function getBranchCache(branchId) {
         userCaches.set(branchId, {
             collections: Object.fromEntries(collectionNames.map(name => [name, new Map()])),
             settings: {},
-            hasSettings: false
+            hasSettings: false,
+            communication: { globalAnnouncement: null, globalPoll: null, pollResponse: null }
         });
     }
     return userCaches.get(branchId);
@@ -78,6 +79,7 @@ function cacheSnapshot(branchId, snapshot) {
     });
     cache.settings = normalizeSettings(snapshot);
     cache.hasSettings = true;
+    if (snapshot.communication) cache.communication = snapshot.communication;
 }
 
 function getLegacyUserCollection(uid, name) {
@@ -106,6 +108,7 @@ async function getBranchAccount(branchId) {
         collection(database, "branchMemberships"),
         where("branchId", "==", branchId)
     ));
+
     const activeMemberships = memberships.docs.filter(item => item.data().active === true);
     if (activeMemberships.length !== 1) {
         throw new Error(activeMemberships.length === 0
@@ -243,6 +246,71 @@ function setBranchAnnouncement(branchId, message) {
             ? { id: crypto.randomUUID(), message: message.trim(), updatedAt: Date.now() }
             : null
     });
+}
+
+async function updateBranchCommunications(branchIds, updates) {
+    const uniqueBranchIds = [...new Set(branchIds)];
+    if (!uniqueBranchIds.length) throw new Error("لا توجد فروع لإرسال الرسالة إليها.");
+    if (uniqueBranchIds.some(branchId => typeof branchId !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(branchId))) {
+        throw new Error("تحتوي قائمة الفروع على معرّف غير صالح.");
+    }
+
+    for (let start = 0; start < uniqueBranchIds.length; start += 400) {
+        const batch = writeBatch(database);
+        uniqueBranchIds.slice(start, start + 400).forEach(branchId => {
+            batch.set(doc(database, "branches", branchId, "settings", "communications"), updates, { merge: true });
+        });
+        await batch.commit();
+    }
+}
+
+async function publishGlobalAnnouncement(branchIds, message) {
+    if (typeof message !== "string" || !message.trim() || message.trim().length > 2000) {
+        throw new Error("اكتب رسالة عامة لا تتجاوز 2000 حرف.");
+    }
+    const announcement = { id: crypto.randomUUID(), message: message.trim(), publishedAt: Date.now() };
+    await updateBranchCommunications(branchIds, { globalAnnouncement: announcement });
+    return announcement;
+}
+
+async function clearGlobalAnnouncement(branchIds) {
+    await updateBranchCommunications(branchIds, { globalAnnouncement: null });
+}
+
+async function publishGlobalPoll(branchIds, question) {
+    if (typeof question !== "string" || !question.trim() || question.trim().length > 1000) {
+        throw new Error("اكتب سؤالًا عامًا لا يتجاوز 1000 حرف.");
+    }
+    const poll = { id: crypto.randomUUID(), question: question.trim(), publishedAt: Date.now() };
+    await updateBranchCommunications(branchIds, { globalPoll: poll, pollResponse: null });
+    return poll;
+}
+
+function getBranchCommunications(branchId) {
+    return getDoc(doc(database, "branches", branchId, "settings", "communications")).then(snapshot => (
+        snapshot.exists()
+            ? snapshot.data()
+            : { globalAnnouncement: null, globalPoll: null, pollResponse: null }
+    ));
+}
+
+function watchBranchCommunication(branchId, onChange, onError) {
+    return onSnapshot(
+        doc(database, "branches", branchId, "settings", "communications"),
+        snapshot => onChange(snapshot.exists()
+            ? snapshot.data()
+            : { globalAnnouncement: null, globalPoll: null, pollResponse: null }),
+        onError
+    );
+}
+
+function submitGlobalPollResponse(branchId, pollId, answer) {
+    if (typeof pollId !== "string" || !pollId || !["yes", "no"].includes(answer)) {
+        throw new Error("إجابة الاستطلاع غير صالحة.");
+    }
+    return setDoc(doc(database, "branches", branchId, "settings", "communications"), {
+        pollResponse: { pollId, answer, respondedAt: Date.now() }
+    }, { merge: true });
 }
 
 function restoreBranchConfiguration(branchId, uid, configuration) {
@@ -503,6 +571,7 @@ function watchBranchAccess(branchId, uid, onRevoked, onError, onBranchChange, on
 function makeSnapshot(cache) {
     return {
         ...cache.settings,
+        communication: cache.communication,
         ...Object.fromEntries(collectionNames.map(name => [
             name,
             Array.from(cache.collections[name].values(), item => JSON.parse(JSON.stringify(item.value)))
@@ -563,7 +632,7 @@ function subscribeSnapshot(branchId, onChange, onError) {
     const cache = getBranchCache(branchId);
     const unsubscribeFunctions = [];
     let active = true;
-    let initialSnapshotsRemaining = collectionNames.length + 1;
+    let initialSnapshotsRemaining = collectionNames.length + 2;
     let initialSettled = false;
     let updateScheduled = false;
     let resolveInitial;
@@ -635,6 +704,18 @@ function subscribeSnapshot(branchId, onChange, onError) {
                 cache.settings = snapshot.exists() ? normalizeSettings(snapshot.data()) : normalizeSettings({});
                 if (!receivedInitialSettings) receivedInitialSettings = true;
             }, !receivedInitialSettings),
+            handleError
+        ));
+
+        let receivedInitialCommunication = false;
+        unsubscribeFunctions.push(onSnapshot(
+            doc(database, "branches", branchId, "settings", "communications"),
+            snapshot => receiveSnapshot(() => {
+                cache.communication = snapshot.exists()
+                    ? snapshot.data()
+                    : { globalAnnouncement: null, globalPoll: null, pollResponse: null };
+                if (!receivedInitialCommunication) receivedInitialCommunication = true;
+            }, !receivedInitialCommunication),
             handleError
         ));
     } catch (error) {
@@ -1037,6 +1118,12 @@ const firebaseService = {
     removeBranch,
     setBranchAccountPermissions,
     setBranchAnnouncement,
+    publishGlobalAnnouncement,
+    clearGlobalAnnouncement,
+    publishGlobalPoll,
+    getBranchCommunications,
+    watchBranchCommunication,
+    submitGlobalPollResponse,
     setBranchDailyFeesVisibility,
     restoreBranchConfiguration,
     registerBranchDevice,

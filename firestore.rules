@@ -40,7 +40,26 @@ service cloud.firestore {
     }
 
     match /branches/{branchId}/settings/{settingId} {
-      allow read, write: if isSystemAdmin() || isActiveBranchMember(branchId);
+      allow read, write: if settingId != "communications"
+        && (isSystemAdmin() || isActiveBranchMember(branchId));
+    }
+
+    match /branches/{branchId}/settings/communications {
+      allow read: if isSystemAdmin() || isActiveBranchMember(branchId);
+      allow create: if isSystemAdmin();
+      allow update: if isSystemAdmin()
+        || (isActiveBranchMember(branchId)
+          && resource.data.globalPoll is map
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["pollResponse"])
+          && request.resource.data.pollResponse is map
+          && request.resource.data.pollResponse.keys().hasOnly(["pollId", "answer", "respondedAt"])
+          && request.resource.data.pollResponse.pollId == resource.data.globalPoll.id
+          && request.resource.data.pollResponse.answer in ["yes", "no"]
+          && request.resource.data.pollResponse.respondedAt is int
+          && (!resource.data.keys().hasAny(["pollResponse"])
+            || resource.data.pollResponse == null
+            || resource.data.pollResponse.pollId != resource.data.globalPoll.id));
+      allow delete: if isSystemAdmin();
     }
 
     match /branches/{branchId}/activityLogs/{logId} {

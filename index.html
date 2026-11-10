@@ -3,20 +3,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sama Phone | نظام إدارة المحافظ والكاش</title>
+    <title>SAMA PHONE | نظام إدارة المحافظ والكاش</title>
     <!-- Alpine.js -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <!-- Google Fonts (Cairo) -->
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="./styles.css">
+    <link rel="stylesheet" href="./theme.css">
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col" x-data="skyProApp()" x-init="initApp()" @keydown="handleWorkflowKeyboard($event)" @wheel.capture="handleNumberInputWheel($event)">
 
-    <div id="samaPhoneSplash" class="splash-screen" role="status" aria-label="جاري تحميل Sama Phone">
+    <div id="samaPhoneSplash" class="splash-screen" role="status" aria-label="جاري تحميل SAMA PHONE">
+        <div class="splash-cosmos" aria-hidden="true">
+            <span class="splash-nebula splash-nebula-one"></span>
+            <span class="splash-nebula splash-nebula-two"></span>
+            <span class="splash-nebula splash-nebula-three"></span>
+            <span class="splash-orbit splash-orbit-one"></span>
+            <span class="splash-orbit splash-orbit-two"></span>
+            <span class="splash-orbit splash-orbit-three"></span>
+            <span class="splash-starfield"></span>
+            <span class="splash-grid"></span>
+        </div>
         <div class="splash-content">
-            <h1 class="splash-brand" aria-label="Sama Phone"><span>Sama Phone</span></h1>
+            <div class="splash-eyebrow"><span class="splash-eyebrow-dot"></span> منظومة إدارة متكاملة</div>
+            <div class="splash-brand-lockup">
+                <span class="splash-logo-mark" aria-hidden="true">
+                    <svg viewBox="0 0 48 48" fill="none">
+                        <path d="M16 8.5h16a3.5 3.5 0 0 1 3.5 3.5v24a3.5 3.5 0 0 1-3.5 3.5H16a3.5 3.5 0 0 1-3.5-3.5V12a3.5 3.5 0 0 1 3.5-3.5Z" stroke="currentColor" stroke-width="2.4"/>
+                        <path d="M19 14h10M21 33h6" stroke="currentColor" stroke-linecap="round" stroke-width="2.4"/>
+                        <path d="m19.5 23 3 3 6-7" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4"/>
+                    </svg>
+                </span>
+                <h1 class="splash-brand" aria-label="SAMA PHONE"><span>SAMA PHONE</span></h1>
+            </div>
+            <p class="splash-tagline">كل حساباتك. في مكان واحد.</p>
+            <p class="splash-description">إدارة الكاش والمحافظ والخطوط — بدقة تواكب شغلك، وبساطة تريح يومك.</p>
+            <div class="splash-highlights" aria-label="مميزات النظام">
+                <span><i></i> متابعة لحظية</span>
+                <span><i></i> حسابات دقيقة</span>
+                <span><i></i> كل الفروع معًا</span>
+            </div>
+            <div class="splash-loading">
+                <div class="splash-loader" aria-hidden="true"><span></span></div>
+                <p id="samaPhoneSplashStatus" class="splash-status" role="status">جاري تهيئة النظام...</p>
+            </div>
+            <p class="splash-credit">صُنع بعناية <span aria-hidden="true">·</span> تطوير <strong>سيد ياسر</strong></p>
         </div>
     </div>
 
@@ -44,7 +77,7 @@
             </template>
             <template x-if="!firebaseReady">
                 <div class="space-y-4 text-center">
-                    <h1 class="text-2xl font-black text-slate-900">Sama Phone</h1>
+                    <h1 class="text-2xl font-black text-slate-900">SAMA PHONE</h1>
                     <p class="text-sm font-bold text-slate-600">جاري الاتصال بخدمات Firebase...</p>
                     <p x-show="firebaseAuthError" x-text="firebaseAuthError" role="alert" class="firebase-error-notice text-sm font-bold"></p>
                     <p x-show="firebaseErrorDetails" x-text="firebaseErrorDetails" dir="ltr" class="rounded-lg bg-slate-50 p-2 text-left text-[11px] text-slate-500"></p>
@@ -53,7 +86,10 @@
             <template x-if="firebaseReady && !firebaseUser">
                 <form @submit.prevent="signInFirebase()" class="login-form space-y-4">
                     <div class="text-center">
-                        <div class="login-brand-mark"><i data-lucide="store"></i></div>
+                        <div class="login-brand-lockup">
+                            <div class="login-brand-mark"><i data-lucide="store"></i></div>
+                            <span class="login-brand-name">SAMA PHONE</span>
+                        </div>
                         <h1 class="text-2xl font-black text-slate-900">تسجيل الدخول</h1>
                         <p class="mt-1 text-sm font-semibold text-slate-500">اختر الفرع وأدخل بيانات حسابك</p>
                     </div>
@@ -182,6 +218,36 @@
         </div>
     </header>
 
+    <aside x-show="firebaseDataReady && currentBranch?.communication?.globalAnnouncement?.message && globalAnnouncementDismissedId !== currentBranch.communication.globalAnnouncement.id" x-cloak aria-live="polite" class="global-announcement mx-auto mt-3 flex max-w-7xl items-start justify-between gap-3 rounded-2xl px-4 py-3 text-sm shadow-sm">
+        <div class="flex items-start gap-2">
+            <i data-lucide="megaphone" class="mt-0.5 h-4 w-4 shrink-0"></i>
+            <div>
+                <p class="mb-1 text-[10px] font-black uppercase tracking-wide">رسالة عامة من الإدارة — لكل الفروع</p>
+                <p class="whitespace-pre-wrap font-bold" x-text="currentBranch?.communication?.globalAnnouncement?.message"></p>
+            </div>
+        </div>
+        <button @click="globalAnnouncementDismissedId = currentBranch.communication.globalAnnouncement.id" class="shrink-0 rounded-lg bg-white/80 px-2.5 py-1 text-xs font-bold">إخفاء</button>
+    </aside>
+
+    <aside x-show="firebaseDataReady && currentBranch?.communication?.globalPoll?.question" x-cloak aria-live="polite" class="global-poll-card mx-auto mt-3 max-w-7xl rounded-2xl p-4 shadow-sm">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="flex items-start gap-2">
+                <i data-lucide="circle-help" class="mt-0.5 h-5 w-5 shrink-0"></i>
+                <div>
+                    <p class="text-[10px] font-black uppercase tracking-wide">سؤال من الإدارة — مطلوب رد الفرع</p>
+                    <p class="mt-1 whitespace-pre-wrap text-sm font-extrabold" x-text="currentBranch?.communication?.globalPoll?.question"></p>
+                </div>
+            </div>
+            <div x-show="currentBranch?.communication?.pollResponse?.pollId === currentBranch?.communication?.globalPoll?.id" x-cloak class="global-poll-answer-status" x-text="language === 'en' ? (currentBranch?.communication?.pollResponse?.answer === 'yes' ? 'Branch response recorded: Yes' : 'Branch response recorded: No') : (currentBranch?.communication?.pollResponse?.answer === 'yes' ? 'تم تسجيل إجابة الفرع: نعم' : 'تم تسجيل إجابة الفرع: لا')"></div>
+        </div>
+        <div x-show="currentBranch?.communication?.pollResponse?.pollId !== currentBranch?.communication?.globalPoll?.id" class="mt-3 flex flex-wrap items-center gap-2">
+            <span class="text-xs font-bold">إجابة واحدة عن الفرع كله:</span>
+            <button @click="submitGlobalPollResponse('yes')" :disabled="globalPollResponseBusy" class="rounded-xl bg-emerald-700 px-5 py-2 text-xs font-extrabold text-white disabled:opacity-50" x-text="globalPollResponseBusy ? (language === 'en' ? 'Saving response...' : 'جاري تسجيل الإجابة...') : (language === 'en' ? 'Yes' : 'نعم')"></button>
+            <button @click="submitGlobalPollResponse('no')" :disabled="globalPollResponseBusy" class="rounded-xl bg-rose-700 px-5 py-2 text-xs font-extrabold text-white disabled:opacity-50" x-text="language === 'en' ? 'No' : 'لا'"></button>
+        </div>
+        <p x-show="globalPollResponseError" x-text="globalPollResponseError" role="alert" class="mt-2 text-xs font-bold text-rose-700"></p>
+    </aside>
+
     <aside x-show="firebaseDataReady && currentBranch?.announcement?.message && branchAnnouncementDismissedId !== currentBranch.announcement.id" x-cloak class="mx-auto mt-3 flex max-w-7xl items-start justify-between gap-3 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-950 shadow-sm">
         <div class="flex items-start gap-2">
             <i data-lucide="megaphone" class="mt-0.5 h-4 w-4 shrink-0 text-violet-700"></i>
@@ -243,7 +309,7 @@
                                     <span class="num-en text-slate-400">200,000</span>
                                 </div>
                                 <div class="flex items-center justify-between gap-1 text-[9px] font-extrabold leading-tight">
-                                    <span class="whitespace-nowrap text-rose-600">المستخدم <b class="num-en" x-text="formatMoney(limitSummary.monthlyUsed)"></b></span>
+                                    <span class="whitespace-nowrap text-rose-600">المودع <b class="num-en" x-text="formatMoney(limitSummary.monthlyUsed)"></b></span>
                                     <span class="whitespace-nowrap text-emerald-700">المتبقي <b class="num-en" x-text="formatMoney(limitSummary.monthlyRemaining)"></b></span>
                                 </div>
                                 <div class="cashier-limit-progress"><span :style="'width:' + limitSummary.monthlyPercent + '%'"></span></div>
@@ -255,13 +321,13 @@
                                     <span class="num-en text-slate-400">60,000</span>
                                 </div>
                                 <div class="flex items-center justify-between gap-1 text-[9px] font-extrabold leading-tight">
-                                    <span class="whitespace-nowrap text-rose-600">المستخدم <b class="num-en" x-text="formatMoney(limitSummary.dailyUsed)"></b></span>
+                                    <span class="whitespace-nowrap text-rose-600">المودع <b class="num-en" x-text="formatMoney(limitSummary.dailyUsed)"></b></span>
                                     <span class="whitespace-nowrap text-emerald-700">المتاح <b class="num-en" x-text="formatMoney(limitSummary.dailyAvailable)"></b></span>
                                 </div>
                                 <div class="cashier-limit-progress"><span :style="'width:' + limitSummary.dailyPercent + '%'"></span></div>
                             </div>
                         </div>
-                        <p x-show="limitSummary.applies && (!limitSummary.ready || limitSummary.exceeded || (Number(cashierDeposit.amount) > 0 && Number(cashierDeposit.amount) > limitSummary.dailyAvailable))" class="-mt-1 mb-2 text-center text-[9px] font-extrabold text-rose-700" x-text="!limitSummary.ready ? 'انتظر التحقق من وقت الخادم.' : 'تجاوزت المبلغ المتاح على الخط.'"></p>
+                        <p x-show="limitSummary.applies && (!limitSummary.ready || limitSummary.exceeded || (Number(cashierDeposit.amount) > 0 && Number(cashierDeposit.amount) > limitSummary.dailyAvailable))" class="-mt-1 mb-2 text-center text-[9px] font-extrabold text-rose-700" x-text="!limitSummary.ready ? 'انتظر التحقق من وقت الخادم.' : 'تم بلوغ حد الخط أو تجاوزه؛ يمكنك تسجيل العملية.'"></p>
                         <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
                             <span class="bg-emerald-100 text-emerald-800 font-bold px-3 py-1 rounded-full text-sm flex items-center gap-1">
                                 <i data-lucide="arrow-down-left" class="w-4 h-4"></i> إيداع (العميل يدفع كاش)
@@ -274,7 +340,7 @@
                             <div>
                                 <label class="block text-xs font-bold text-slate-600 mb-1">اختر الخط/المحفظة للإيداع:</label>
                                 <div class="flex gap-2">
-                                                    <div class="relative min-w-0 flex-1" @click.outside="cashierWalletDropdown.deposit = false">
+                                    <div class="relative min-w-0 flex-1" @click.outside="cashierWalletDropdown.deposit = false">
                                                         <input type="search" :value="cashierWalletDropdown.deposit ? cashierWalletSearch.deposit : getCashierWalletLabel('deposit')" @focus="openCashierWalletSearch('deposit')" @input="cashierWalletSearch.deposit = $event.target.value; onCashierWalletSearch('deposit')" @keydown.arrow-down.prevent="moveWalletSearch('deposit', 1)" @keydown.arrow-up.prevent="moveWalletSearch('deposit', -1)" @keydown.enter.prevent="selectWalletSearchResult('deposit')" :class="getCashierWalletStatusClass('deposit')" placeholder="ابحث باسم الخط أو رقمه..." autocomplete="off" class="w-full rounded-xl border border-slate-300 bg-slate-50 p-2.5 text-sm font-bold text-slate-800">
                                         <div x-show="cashierWalletDropdown.deposit" x-cloak class="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl">
                                             <template x-for="(w, index) in getFilteredCashierWallets('deposit')" :key="'deposit-search-' + w.id">
@@ -320,7 +386,7 @@
                             <span class="text-xs text-slate-500 font-bold block">إجمالي المطلوب من العميل:</span>
                             <span class="text-xl font-black text-emerald-600 num-en" x-text="formatMoney((cashierDeposit.amount || 0) + (cashierDeposit.fee || 0)) + ' ج'"></span>
                         </div>
-                        <button @click="executeTransaction('deposit')" :disabled="cashierSaveInProgress || (limitSummary.applies && (!limitSummary.ready || (Number(cashierDeposit.amount) > 0 && Number(cashierDeposit.amount) > limitSummary.dailyAvailable)))" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-3 rounded-xl shadow-lg hover:shadow-emerald-200 transition flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50">
+                        <button @click="executeTransaction('deposit')" :disabled="cashierSaveInProgress || (limitSummary.applies && !limitSummary.ready)" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-3 rounded-xl shadow-lg hover:shadow-emerald-200 transition flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50">
                             <i data-lucide="check-circle" class="w-5 h-5"></i> <span x-text="cashierSaveInProgress ? 'جاري الحفظ...' : 'تنفيذ الإيداع'"></span>
                         </button>
                     </div>
@@ -336,7 +402,7 @@
                                     <span class="num-en text-slate-400">200,000</span>
                                 </div>
                                 <div class="flex items-center justify-between gap-1 text-[9px] font-extrabold leading-tight">
-                                    <span class="whitespace-nowrap text-rose-600">المستخدم <b class="num-en" x-text="formatMoney(limitSummary.monthlyUsed)"></b></span>
+                                    <span class="whitespace-nowrap text-rose-600">المسحوب <b class="num-en" x-text="formatMoney(limitSummary.monthlyUsed)"></b></span>
                                     <span class="whitespace-nowrap text-emerald-700">المتبقي <b class="num-en" x-text="formatMoney(limitSummary.monthlyRemaining)"></b></span>
                                 </div>
                                 <div class="cashier-limit-progress"><span :style="'width:' + limitSummary.monthlyPercent + '%'"></span></div>
@@ -348,13 +414,13 @@
                                     <span class="num-en text-slate-400">60,000</span>
                                 </div>
                                 <div class="flex items-center justify-between gap-1 text-[9px] font-extrabold leading-tight">
-                                    <span class="whitespace-nowrap text-rose-600">المستخدم <b class="num-en" x-text="formatMoney(limitSummary.dailyUsed)"></b></span>
+                                    <span class="whitespace-nowrap text-rose-600">المسحوب <b class="num-en" x-text="formatMoney(limitSummary.dailyUsed)"></b></span>
                                     <span class="whitespace-nowrap text-emerald-700">المتاح <b class="num-en" x-text="formatMoney(limitSummary.dailyAvailable)"></b></span>
                                 </div>
                                 <div class="cashier-limit-progress"><span :style="'width:' + limitSummary.dailyPercent + '%'"></span></div>
                             </div>
                         </div>
-                        <p x-show="limitSummary.applies && (!limitSummary.ready || limitSummary.exceeded || (Number(cashierWithdraw.amount) > 0 && Number(cashierWithdraw.amount) > limitSummary.dailyAvailable))" class="-mt-1 mb-2 text-center text-[9px] font-extrabold text-rose-700" x-text="!limitSummary.ready ? 'انتظر التحقق من وقت الخادم.' : 'تجاوزت المبلغ المتاح على الخط.'"></p>
+                        <p x-show="limitSummary.applies && (!limitSummary.ready || limitSummary.exceeded || (Number(cashierWithdraw.amount) > 0 && Number(cashierWithdraw.amount) > limitSummary.dailyAvailable))" class="-mt-1 mb-2 text-center text-[9px] font-extrabold text-rose-700" x-text="!limitSummary.ready ? 'انتظر التحقق من وقت الخادم.' : 'تم بلوغ حد الخط أو تجاوزه؛ يمكنك تسجيل العملية.'"></p>
                         <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
                             <span class="shrink-0 whitespace-nowrap rounded-full bg-rose-100 px-3 py-1 text-xs font-bold text-rose-800 flex items-center gap-1 sm:text-sm">
                                 <i data-lucide="arrow-up-right" class="h-4 w-4 shrink-0"></i> سحب (تحويل للمحفظة)
@@ -413,7 +479,7 @@
                             <span class="text-xs text-slate-500 font-bold block">صافي المدفوع للعميل نقداً:</span>
                             <span class="text-xl font-black text-rose-600 num-en" x-text="formatMoney(Math.max(0, (cashierWithdraw.amount || 0) - (cashierWithdraw.fee || 0))) + ' ج'"></span>
                         </div>
-                        <button @click="executeTransaction('withdraw')" :disabled="cashierSaveInProgress || (limitSummary.applies && (!limitSummary.ready || (Number(cashierWithdraw.amount) > 0 && Number(cashierWithdraw.amount) > limitSummary.dailyAvailable)))" class="bg-rose-600 hover:bg-rose-700 text-white font-bold px-6 py-3 rounded-xl shadow-lg hover:shadow-rose-200 transition flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50">
+                        <button @click="executeTransaction('withdraw')" :disabled="cashierSaveInProgress || (limitSummary.applies && !limitSummary.ready)" class="bg-rose-600 hover:bg-rose-700 text-white font-bold px-6 py-3 rounded-xl shadow-lg hover:shadow-rose-200 transition flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50">
                             <i data-lucide="check-circle" class="w-5 h-5"></i> <span x-text="cashierSaveInProgress ? 'جاري الحفظ...' : 'تنفيذ السحب'"></span>
                         </button>
                     </div>
@@ -531,6 +597,39 @@
                     <p x-show="managerStatus" x-text="managerStatus" role="status" class="mt-2 rounded-lg bg-emerald-50 p-2 text-sm font-bold text-emerald-700"></p>
                     <p x-show="managerError" x-text="managerError" role="alert" class="mt-2 whitespace-pre-wrap rounded-lg bg-rose-50 p-2 text-sm font-bold text-rose-700"></p>
                 </div>
+                <section class="grid gap-4 xl:grid-cols-2" aria-label="الرسائل والاستطلاعات العامة">
+                    <form @submit.prevent="publishGlobalAnnouncement()" class="global-admin-message rounded-2xl p-4 shadow-sm">
+                        <div class="mb-3 flex items-center gap-2">
+                            <i data-lucide="megaphone" class="h-5 w-5"></i>
+                            <div>
+                                <h3 class="font-extrabold">رسالة عامة لكل الفروع</h3>
+                                <p class="text-xs opacity-80">تظهر أعلى رسالة الفرع الفردية بلون أحمر.</p>
+                            </div>
+                        </div>
+                        <textarea x-model="globalAnnouncementForm" rows="3" maxlength="2000" required placeholder="اكتب إعلانًا أو تنبيهًا يظهر لجميع الفروع..." class="w-full rounded-xl border border-rose-200 bg-white p-3 text-sm font-bold text-slate-800"></textarea>
+                        <div class="mt-2 flex flex-wrap items-center justify-between gap-2">
+                            <span class="text-[11px] font-bold" x-text="globalAnnouncementForm.length + ' / 2000'"></span>
+                            <div class="flex gap-2">
+                                <button type="submit" :disabled="managerBusy || !managedBranches.length" class="rounded-xl bg-rose-700 px-4 py-2 text-xs font-extrabold text-white disabled:opacity-50" x-text="managerBusy ? 'جاري الإرسال...' : 'إرسال لكل الفروع'"></button>
+                                <button type="button" @click="clearGlobalAnnouncement()" :disabled="managerBusy || !managedBranches.length" class="rounded-xl border border-rose-300 bg-white px-3 py-2 text-xs font-extrabold text-rose-800 disabled:opacity-50">حذف الرسالة العامة</button>
+                            </div>
+                        </div>
+                    </form>
+                    <form @submit.prevent="publishGlobalPoll()" class="global-admin-poll rounded-2xl p-4 shadow-sm">
+                        <div class="mb-3 flex items-center gap-2">
+                            <i data-lucide="circle-help" class="h-5 w-5"></i>
+                            <div>
+                                <h3 class="font-extrabold">سؤال بنعم أو لا لكل الفروع</h3>
+                                <p class="text-xs opacity-80">كل إجابة جديدة تستبدل الإجابات السابقة على السؤال الجديد.</p>
+                            </div>
+                        </div>
+                        <textarea x-model="globalPollForm" rows="3" maxlength="1000" required placeholder="اكتب السؤال الذي تريد إرساله للفروع..." class="w-full rounded-xl border border-indigo-200 bg-white p-3 text-sm font-bold text-slate-800"></textarea>
+                        <div class="mt-2 flex flex-wrap items-center justify-between gap-2">
+                            <span class="text-[11px] font-bold" x-text="globalPollForm.length + ' / 1000'"></span>
+                            <button type="submit" :disabled="managerBusy || !managedBranches.length" class="rounded-xl bg-indigo-700 px-4 py-2 text-xs font-extrabold text-white disabled:opacity-50" x-text="managerBusy ? 'جاري الإرسال...' : 'إرسال السؤال للجميع'"></button>
+                        </div>
+                    </form>
+                </section>
                 <form @submit.prevent="createBranchFromManager()" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                     <div class="mb-4 flex items-center gap-3">
                         <div class="rounded-xl bg-emerald-50 p-2 text-emerald-700"><i data-lucide="store" class="h-5 w-5"></i></div>
@@ -583,6 +682,14 @@
                                 </div>
                             </div>
                             <div class="space-y-4 p-4">
+                                <div class="global-poll-response-box">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <span class="text-[11px] font-extrabold">رد الفرع على آخر سؤال عام</span>
+                                        <span x-show="branch.communication?.pollResponse?.pollId === branch.communication?.globalPoll?.id && branch.communication?.globalPoll?.id" class="global-poll-response-chip" :class="branch.communication?.pollResponse?.answer === 'yes' ? 'is-yes' : 'is-no'" x-text="language === 'en' ? (branch.communication?.pollResponse?.answer === 'yes' ? 'Yes' : 'No') : (branch.communication?.pollResponse?.answer === 'yes' ? 'نعم' : 'لا')"></span>
+                                        <span x-show="!branch.communication?.globalPoll?.id || branch.communication?.pollResponse?.pollId !== branch.communication?.globalPoll?.id" class="global-poll-response-pending" x-text="language === 'en' ? 'Awaiting response' : 'بانتظار الرد'"></span>
+                                    </div>
+                                    <p class="mt-1 text-[11px] leading-5 text-slate-600" x-text="branch.communication?.globalPoll?.question || 'لم يتم إرسال سؤال عام بعد.'"></p>
+                                </div>
                                 <div class="grid gap-3 sm:grid-cols-2">
                                     <label class="space-y-1.5 text-xs font-bold text-slate-600">اسم الفرع
                                         <input x-model.trim="branch.name" :disabled="managerBusy" class="w-full rounded-lg border border-slate-200 p-2.5">
@@ -1119,19 +1226,26 @@
                         <div class="grid grid-cols-2 gap-3">
                             <div>
                                 <label class="block text-xs font-bold text-slate-600 mb-1">نوع السند:</label>
-                                <select x-model="voucherForm.type" data-workflow-field class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-xs font-bold">
+                                <select x-model="voucherForm.type" data-workflow-field required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-xs font-bold">
+                                    <option value="">-- اختر نوع السند --</option>
                                     <option value="receipt">سند قبض (استلام مبلغ من العميل / سداد دين)</option>
                                     <option value="payment">سند صرف (دفع فلوس لعميل / زيادة دين)</option>
                                 </select>
                             </div>
                             <div>
                                 <label class="block text-xs font-bold text-slate-600 mb-1">اختر العميل (إجباري):</label>
-                                <select x-model="voucherForm.customerId" data-workflow-field class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-xs font-bold">
-                                    <option value="">-- اختر عميل مسجل --</option>
-                                    <template x-for="c in customers" :key="c.id">
-                                        <option :value="c.id" x-text="c.name + ' (' + c.phone + ')'"></option>
-                                    </template>
-                                </select>
+                                <div class="relative" @click.outside="voucherCustomerDropdownOpen = false">
+                                    <input type="search" :value="voucherCustomerSearch" @focus="voucherCustomerDropdownOpen = true" @input="voucherCustomerSearch = $event.target.value; voucherForm.customerId = ''; voucherCustomerDropdownOpen = true" data-workflow-field data-workflow-action="voucher-customer" placeholder="ابحث باسم العميل أو رقم الهاتف..." autocomplete="off" class="w-full rounded-xl border border-slate-300 bg-slate-50 p-2 text-xs font-bold">
+                                    <div x-show="voucherCustomerDropdownOpen" x-cloak class="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl">
+                                        <template x-for="customer in getFilteredVoucherCustomers()" :key="'voucher-customer-' + customer.id">
+                                            <button type="button" @click="selectVoucherCustomer(customer)" class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-right text-xs font-bold text-slate-800 hover:bg-indigo-50">
+                                                <span x-text="customer.name"></span>
+                                                <span class="text-slate-500 num-en" x-text="customer.phone || 'بدون رقم هاتف'"></span>
+                                            </button>
+                                        </template>
+                                        <p x-show="getFilteredVoucherCustomers().length === 0" class="p-3 text-center text-xs font-bold text-slate-400">لا يوجد عميل بهذا الاسم أو الرقم.</p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -1686,7 +1800,7 @@
             return () => {
                 if (requested) return;
                 requested = true;
-                const delay = Math.max(0, 850 - (Date.now() - startedAt));
+                const delay = Math.max(0, 3200 - (Date.now() - startedAt));
                 window.setTimeout(() => {
                     const splash = document.getElementById('samaPhoneSplash');
                     if (!splash) return;
@@ -1695,7 +1809,10 @@
                 }, delay);
             };
         })();
-        window.setTimeout(window.dismissSamaSplash, 1600);
+        window.updateSamaSplashStatus = message => {
+            const status = document.getElementById('samaPhoneSplashStatus');
+            if (status && typeof message === 'string') status.textContent = message;
+        };
     </script>
     <script type="module" src="./firebase.js" onerror="window.firebaseServiceError = 'تعذر تحميل firebase.js. شغّل النظام من خلال خادم ويب وتأكد من وجود الملف.'; window.dispatchEvent(new CustomEvent('firebase-service-error', { detail: window.firebaseServiceError }));"></script>
 </body>
