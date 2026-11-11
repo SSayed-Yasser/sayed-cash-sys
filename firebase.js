@@ -7,7 +7,6 @@ import {
     browserLocalPersistence,
     browserSessionPersistence,
     setPersistence,
-    sendPasswordResetEmail,
     signInWithEmailAndPassword,
     signOut
 } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-auth.js";
@@ -50,6 +49,13 @@ const collectionNames = ["wallets", "transactions", "vouchers", "customers", "cl
 const userCaches = new Map();
 const pendingWrites = new Map();
 const managerEmail = "sayedyassersy1@gmail.com";
+const defaultManagerMonitoringSettings = {
+    reportsEnabled: true,
+    outboundEnabled: true,
+    cashierInteractionEnabled: true,
+    remindersEnabled: true,
+    refreshIntervalMinutes: 15
+};
 
 isSupported()
     .then(supported => {
@@ -149,6 +155,37 @@ function setBranchAccountPassword(branchId, password) {
     return callManagerFunction("setBranchAccountPassword", { branchId, password });
 }
 
+function updateBranchAccountEmail(branchId, email) {
+    return callManagerFunction("updateBranchAccountEmail", { branchId, email });
+}
+
+function saveInternalManagerEmail({ subject, text, category }) {
+    if (typeof subject !== "string" || !subject.trim() || subject.length > 250) {
+        return Promise.reject(new Error("عنوان رسالة البريد الداخلي غير صالح."));
+    }
+    if (typeof text !== "string" || !text.trim() || text.length > 60000) {
+        return Promise.reject(new Error("محتوى رسالة البريد الداخلي غير صالح."));
+    }
+    if (!["test", "manual_report"].includes(category)) {
+        return Promise.reject(new Error("نوع رسالة البريد الداخلي غير صالح."));
+    }
+
+    const emailReference = doc(collection(database, "managerEmails"));
+    const savedAt = Date.now();
+    return setDoc(emailReference, {
+        subject: subject.trim(),
+        text,
+        recipient: "البريد الداخلي للنظام",
+        category,
+        status: "saved",
+        deliveryMode: "internal",
+        createdAt: savedAt,
+        savedAt,
+        errorCode: null,
+        errorMessage: null
+    }).then(() => ({ id: emailReference.id, savedAt }));
+}
+
 async function createBranch({ name, emailKeyword, email, password }) {
     const normalizedEmail = email.trim().toLowerCase();
     const normalizedKeyword = emailKeyword.trim().toLowerCase();
@@ -207,10 +244,11 @@ async function createBranch({ name, emailKeyword, email, password }) {
         email: normalizedEmail,
         active: true,
         canAccessAdmin: false,
+        canEditCustomers: false,
         createdAt: Date.now()
     });
     await batch.commit();
-    return { id: branchReference.id, name: name.trim(), emailKeyword: normalizedKeyword, active: true, account: { uid, email: normalizedEmail, branchId: branchReference.id, active: true, canAccessAdmin: false } };
+    return { id: branchReference.id, name: name.trim(), emailKeyword: normalizedKeyword, active: true, account: { uid, email: normalizedEmail, branchId: branchReference.id, active: true, canAccessAdmin: false, canEditCustomers: false } };
 }
 
 async function updateBranchDetails(branchId, name, emailKeyword) {
@@ -233,10 +271,11 @@ async function updateBranchDetails(branchId, name, emailKeyword) {
     });
 }
 
-function setBranchAccountPermissions(uid, { active, canAccessAdmin }) {
+function setBranchAccountPermissions(uid, { active, canAccessAdmin, canEditCustomers }) {
     return updateDoc(doc(database, "branchMemberships", uid), {
         ...(typeof active === "boolean" ? { active } : {}),
-        ...(typeof canAccessAdmin === "boolean" ? { canAccessAdmin } : {})
+        ...(typeof canAccessAdmin === "boolean" ? { canAccessAdmin } : {}),
+        ...(typeof canEditCustomers === "boolean" ? { canEditCustomers } : {})
     });
 }
 
@@ -264,17 +303,50 @@ async function updateBranchCommunications(branchIds, updates) {
     }
 }
 
-async function publishGlobalAnnouncement(branchIds, message) {
+async function publishGlobalAnnouncement(branchIds, message, options = {}) {
     if (typeof message !== "string" || !message.trim() || message.trim().length > 2000) {
         throw new Error("اكتب رسالة عامة لا تتجاوز 2000 حرف.");
     }
-    const announcement = { id: crypto.randomUUID(), message: message.trim(), publishedAt: Date.now() };
+    const displayMode = options.displayMode === "popup" ? "popup" : "inline";
+    const severity = ["info", "success", "warning", "urgent"].includes(options.severity)
+        ? options.severity
+        : "info";
+    const announcement = {
+        id: crypto.randomUUID(),
+        message: message.trim(),
+        displayMode,
+        severity,
+        publishedAt: Date.now()
+    };
     await updateBranchCommunications(branchIds, { globalAnnouncement: announcement });
     return announcement;
 }
 
 async function clearGlobalAnnouncement(branchIds) {
     await updateBranchCommunications(branchIds, { globalAnnouncement: null });
+}
+
+async function clearAllBranchCommunications(branchIds) {
+    const uniqueBranchIds = [...new Set(branchIds)];
+    if (!uniqueBranchIds.length) throw new Error("لا توجد فروع لحذف الرسائل منها.");
+    if (uniqueBranchIds.some(branchId => typeof branchId !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(branchId))) {
+        throw new Error("تحتوي قائمة الفروع على معرّف غير صالح.");
+    }
+
+    for (let start = 0; start < uniqueBranchIds.length; start += 200) {
+        const batch = writeBatch(database);
+        uniqueBranchIds.slice(start, start + 200).forEach(branchId => {
+            batch.set(doc(database, "branches", branchId, "settings", "communications"), {
+                globalAnnouncement: null,
+                globalPoll: null,
+                pollResponse: null,
+                assistantNotice: null,
+                assistantNoticeRead: null
+            }, { merge: true });
+            batch.update(doc(database, "branches", branchId), { announcement: null });
+        });
+        await batch.commit();
+    }
 }
 
 async function publishGlobalPoll(branchIds, question) {
@@ -286,12 +358,51 @@ async function publishGlobalPoll(branchIds, question) {
     return poll;
 }
 
+async function clearGlobalPoll(branchIds) {
+    await updateBranchCommunications(branchIds, { globalPoll: null, pollResponse: null });
+}
+
 function getBranchCommunications(branchId) {
     return getDoc(doc(database, "branches", branchId, "settings", "communications")).then(snapshot => (
         snapshot.exists()
             ? snapshot.data()
             : { globalAnnouncement: null, globalPoll: null, pollResponse: null }
     ));
+}
+
+function watchBranchMonitoringAlerts(branchId, maxEntries, onChange, onError) {
+    const alertsQuery = query(
+        collection(database, "branches", branchId, "monitoringAlerts"),
+        orderBy("createdAt", "desc"),
+        limit(maxEntries)
+    );
+    return onSnapshot(
+        alertsQuery,
+        snapshot => onChange(snapshot.docs.map(item => ({ id: item.id, ...item.data() }))),
+        onError
+    );
+}
+
+function watchManagerEmails(maxEntries, onChange, onError) {
+    const emailsQuery = query(
+        collection(database, "managerEmails"),
+        orderBy("createdAt", "desc"),
+        limit(maxEntries)
+    );
+    return onSnapshot(
+        emailsQuery,
+        snapshot => onChange(snapshot.docs.map(item => ({ id: item.id, ...item.data() }))),
+        onError
+    );
+}
+
+function saveBranchPerformanceStatus(branchId, performanceStatus) {
+    if (!branchId || !performanceStatus || typeof performanceStatus !== "object") {
+        return Promise.reject(new Error("بيانات ترتيب الفرع غير صالحة."));
+    }
+    return setDoc(doc(database, "branches", branchId, "settings", "communications"), {
+        performanceStatus
+    }, { merge: true });
 }
 
 function watchBranchCommunication(branchId, onChange, onError) {
@@ -310,6 +421,46 @@ function submitGlobalPollResponse(branchId, pollId, answer) {
     }
     return setDoc(doc(database, "branches", branchId, "settings", "communications"), {
         pollResponse: { pollId, answer, respondedAt: Date.now() }
+    }, { merge: true });
+}
+
+async function getManagerMonitoringSettings() {
+    const reference = doc(database, "systemSettings", "monitoring");
+    const snapshot = await getDoc(reference);
+    if (snapshot.exists()) return { ...defaultManagerMonitoringSettings, ...snapshot.data() };
+    await setDoc(reference, { ...defaultManagerMonitoringSettings, updatedAt: Date.now() });
+    return { ...defaultManagerMonitoringSettings };
+}
+
+async function saveManagerMonitoringSettings(settings) {
+    const updates = {};
+    for (const key of ["reportsEnabled", "outboundEnabled", "cashierInteractionEnabled", "remindersEnabled"]) {
+        if (typeof settings[key] === "boolean") updates[key] = settings[key];
+    }
+    if ([0, 1, 5, 15].includes(settings.refreshIntervalMinutes)) {
+        updates.refreshIntervalMinutes = settings.refreshIntervalMinutes;
+    }
+    if (!Object.keys(updates).length) throw new Error("لا توجد إعدادات متابعة صالحة للحفظ.");
+    await setDoc(doc(database, "systemSettings", "monitoring"), {
+        ...updates,
+        updatedAt: Date.now()
+    }, { merge: true });
+    return updates;
+}
+
+function acknowledgeAssistantNotice(branchId, noticeId) {
+    if (typeof noticeId !== "string" || !noticeId) {
+        throw new Error("معرّف التنبيه غير صالح.");
+    }
+    return setDoc(doc(database, "branches", branchId, "settings", "communications"), {
+        assistantNoticeRead: { noticeId, readAt: Date.now() }
+    }, { merge: true });
+}
+
+function clearAssistantNotice(branchId) {
+    return setDoc(doc(database, "branches", branchId, "settings", "communications"), {
+        assistantNotice: null,
+        assistantNoticeRead: null
     }, { merge: true });
 }
 
@@ -333,6 +484,9 @@ function restoreBranchConfiguration(branchId, uid, configuration) {
     }
     if (uid && typeof configuration.canAccessAdmin === "boolean") {
         membershipUpdates.canAccessAdmin = configuration.canAccessAdmin;
+    }
+    if (uid && typeof configuration.canEditCustomers === "boolean") {
+        membershipUpdates.canEditCustomers = configuration.canEditCustomers;
     }
 
     const batch = writeBatch(database);
@@ -416,12 +570,14 @@ async function registerBranchDevice(branchId, uid) {
     const snapshot = await getDocFromServer(deviceReference);
     if (snapshot.exists() && (snapshot.data().enabled === false || snapshot.data().deleted === true)) return false;
 
+    const firstSeenAt = Number(snapshot.data()?.firstSeenAt) || Date.now();
     const deviceData = {
         uid,
         deviceId: deviceSessionId,
         deviceName: getDeviceName(),
         email: auth.currentUser?.email || "",
         userAgent: navigator.userAgent || "",
+        firstSeenAt,
         lastSeen: Date.now()
     };
     await setDoc(deviceReference, snapshot.exists()
@@ -585,7 +741,9 @@ function normalizeSettings(settings) {
         drawerOpeningBalance: settings.drawerOpeningBalance ?? 0,
         pinnedDepositWalletId: settings.pinnedDepositWalletId ?? null,
         pinnedWithdrawWalletId: settings.pinnedWithdrawWalletId ?? null,
-        dailyFeesVisibility: ["show", "blur", "hide"].includes(settings.dailyFeesVisibility) ? settings.dailyFeesVisibility : "show"
+        dailyFeesVisibility: ["show", "blur", "hide"].includes(settings.dailyFeesVisibility) ? settings.dailyFeesVisibility : "show",
+        allowCommissionEdit: settings.allowCommissionEdit !== false,
+        transactionPeriodReset: settings.transactionPeriodReset === "closing" ? "closing" : "daily"
     };
 }
 
@@ -625,6 +783,26 @@ async function setBranchDailyFeesVisibility(branchId, visibility) {
 
     const cache = getBranchCache(branchId);
     cache.settings = { ...settings, dailyFeesVisibility: visibility };
+    cache.hasSettings = true;
+}
+
+async function setBranchOperatingSettings(branchId, settings) {
+    const updates = {};
+    if (typeof settings.allowCommissionEdit === "boolean") {
+        updates.allowCommissionEdit = settings.allowCommissionEdit;
+    }
+    if (["daily", "closing"].includes(settings.transactionPeriodReset)) {
+        updates.transactionPeriodReset = settings.transactionPeriodReset;
+    }
+    if (!Object.keys(updates).length) throw new Error("لا توجد إعدادات صالحة لحفظها.");
+
+    const reference = doc(database, "branches", branchId, "settings", "system");
+    const currentSnapshot = await getDoc(reference);
+    const currentSettings = normalizeSettings(currentSnapshot.exists() ? currentSnapshot.data() : {});
+    await setDoc(reference, updates, { merge: true });
+
+    const cache = getBranchCache(branchId);
+    cache.settings = { ...currentSettings, ...updates };
     cache.hasSettings = true;
 }
 
@@ -1095,9 +1273,6 @@ const firebaseService = {
     setAuthPersistence(rememberSession) {
         return setPersistence(auth, rememberSession ? browserLocalPersistence : browserSessionPersistence);
     },
-    resetPassword(email) {
-        return sendPasswordResetEmail(auth, email);
-    },
     signOut() {
         return signOut(auth);
     },
@@ -1113,6 +1288,8 @@ const firebaseService = {
     listBranchAccounts,
     getBranchAccountEmails,
     setBranchAccountPassword,
+    updateBranchAccountEmail,
+    saveInternalManagerEmail,
     createBranch,
     updateBranchDetails,
     removeBranch,
@@ -1120,11 +1297,21 @@ const firebaseService = {
     setBranchAnnouncement,
     publishGlobalAnnouncement,
     clearGlobalAnnouncement,
+    clearAllBranchCommunications,
     publishGlobalPoll,
+    clearGlobalPoll,
     getBranchCommunications,
+    watchBranchMonitoringAlerts,
+    watchManagerEmails,
+    saveBranchPerformanceStatus,
     watchBranchCommunication,
     submitGlobalPollResponse,
+    getManagerMonitoringSettings,
+    saveManagerMonitoringSettings,
+    acknowledgeAssistantNotice,
+    clearAssistantNotice,
     setBranchDailyFeesVisibility,
+    setBranchOperatingSettings,
     restoreBranchConfiguration,
     registerBranchDevice,
     clearCurrentDeviceBlock,

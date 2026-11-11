@@ -21,6 +21,12 @@ service cloud.firestore {
         && get(branchPath).data.active == true;
     }
 
+    function canEditBranchCustomers(branchId) {
+      let membershipPath = /databases/$(database)/documents/branchMemberships/$(request.auth.uid);
+      return isActiveBranchMember(branchId)
+        && get(membershipPath).data.get('canEditCustomers', false) == true;
+    }
+
     function canAccessOwnUserData(userId) {
       let membershipPath = /databases/$(database)/documents/branchMemberships/$(userId);
       return signedIn()
@@ -36,7 +42,19 @@ service cloud.firestore {
     }
 
     match /branches/{branchId}/data/{collectionName}/items/{recordId} {
-      allow read, write: if isSystemAdmin() || isActiveBranchMember(branchId);
+      allow read: if isSystemAdmin() || isActiveBranchMember(branchId);
+      allow write: if collectionName != "customers"
+        && (isSystemAdmin() || isActiveBranchMember(branchId));
+    }
+
+    match /branches/{branchId}/data/customers/items/{recordId} {
+      allow read: if isSystemAdmin() || isActiveBranchMember(branchId);
+      allow create: if isSystemAdmin() || isActiveBranchMember(branchId);
+      allow update: if isSystemAdmin()
+        || (isActiveBranchMember(branchId)
+          && (request.resource.data.diff(resource.data).affectedKeys().hasOnly(["balance"])
+            || canEditBranchCustomers(branchId)));
+      allow delete: if isSystemAdmin() || canEditBranchCustomers(branchId);
     }
 
     match /branches/{branchId}/settings/{settingId} {
@@ -49,16 +67,22 @@ service cloud.firestore {
       allow create: if isSystemAdmin();
       allow update: if isSystemAdmin()
         || (isActiveBranchMember(branchId)
-          && resource.data.globalPoll is map
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["pollResponse"])
-          && request.resource.data.pollResponse is map
-          && request.resource.data.pollResponse.keys().hasOnly(["pollId", "answer", "respondedAt"])
-          && request.resource.data.pollResponse.pollId == resource.data.globalPoll.id
-          && request.resource.data.pollResponse.answer in ["yes", "no"]
-          && request.resource.data.pollResponse.respondedAt is int
-          && (!resource.data.keys().hasAny(["pollResponse"])
-            || resource.data.pollResponse == null
-            || resource.data.pollResponse.pollId != resource.data.globalPoll.id));
+          && ((resource.data.globalPoll is map
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["pollResponse"])
+              && request.resource.data.pollResponse is map
+              && request.resource.data.pollResponse.keys().hasOnly(["pollId", "answer", "respondedAt"])
+              && request.resource.data.pollResponse.pollId == resource.data.globalPoll.id
+              && request.resource.data.pollResponse.answer in ["yes", "no"]
+              && request.resource.data.pollResponse.respondedAt is int
+              && (!resource.data.keys().hasAny(["pollResponse"])
+                || resource.data.pollResponse == null
+                || resource.data.pollResponse.pollId != resource.data.globalPoll.id))
+            || (resource.data.assistantNotice is map
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["assistantNoticeRead"])
+              && request.resource.data.assistantNoticeRead is map
+              && request.resource.data.assistantNoticeRead.keys().hasOnly(["noticeId", "readAt"])
+              && request.resource.data.assistantNoticeRead.noticeId == resource.data.assistantNotice.id
+              && request.resource.data.assistantNoticeRead.readAt is int)));
       allow delete: if isSystemAdmin();
     }
 
@@ -71,10 +95,44 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    match /branches/{branchId}/monitoringAlerts/{alertId} {
+      allow read: if isSystemAdmin();
+      allow write: if false;
+    }
+
     match /branchMemberships/{userId} {
       allow get: if isSystemAdmin() || (signedIn() && request.auth.uid == userId);
       allow list: if isSystemAdmin();
       allow create, update, delete: if isSystemAdmin();
+    }
+
+    match /managerEmails/{emailId} {
+      allow read: if isSystemAdmin();
+      allow create: if isSystemAdmin()
+        && request.resource.data.keys().hasOnly([
+          'subject', 'text', 'recipient', 'category', 'status', 'deliveryMode',
+          'createdAt', 'savedAt', 'errorCode', 'errorMessage'
+        ])
+        && request.resource.data.keys().hasAll([
+          'subject', 'text', 'recipient', 'category', 'status', 'deliveryMode',
+          'createdAt', 'savedAt', 'errorCode', 'errorMessage'
+        ])
+        && request.resource.data.subject is string
+        && request.resource.data.subject.size() > 0
+        && request.resource.data.subject.size() <= 250
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 60000
+        && request.resource.data.recipient == 'البريد الداخلي للنظام'
+        && request.resource.data.category in ['test', 'manual_report']
+        && request.resource.data.status == 'saved'
+        && request.resource.data.deliveryMode == 'internal'
+        && request.resource.data.createdAt is int
+        && request.resource.data.savedAt is int
+        && request.resource.data.createdAt == request.resource.data.savedAt
+        && request.resource.data.errorCode == null
+        && request.resource.data.errorMessage == null;
+      allow update, delete: if false;
     }
 
     match /users/{userId}/{document=**} {
@@ -92,9 +150,17 @@ service cloud.firestore {
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.deviceId == deviceId
         && request.resource.data.get('enabled', true) == resource.data.get('enabled', true)
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['firstSeenAt'])
+          || request.resource.data.firstSeenAt is int)
+        && (!resource.data.keys().hasAny(['firstSeenAt'])
+          || request.resource.data.firstSeenAt == resource.data.firstSeenAt)
         && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['lastSeen', 'deviceName', 'email', 'userAgent']));
+          .hasOnly(['lastSeen', 'firstSeenAt', 'deviceName', 'email', 'userAgent']));
       allow delete: if isSystemAdmin();
+    }
+
+    match /systemSettings/{settingId} {
+      allow read, write: if isSystemAdmin();
     }
   }
 }

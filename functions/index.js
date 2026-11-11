@@ -1,24 +1,21 @@
+import { createHash, randomUUID } from "node:crypto";
 import { getApp, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
-import { onDocumentCreated } from "firebase-functions/v2/firestore";
+import { onDocumentCreated, onDocumentUpdated } from "firebase-functions/v2/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
-import { defineSecret } from "firebase-functions/params";
-import nodemailer from "nodemailer";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 
 initializeApp();
 
 const adminAuth = getAuth();
 const database = getFirestore(getApp(), "default");
-const smtpHost = defineSecret("SMTP_HOST");
-const smtpPort = defineSecret("SMTP_PORT");
-const smtpUser = defineSecret("SMTP_USER");
-const smtpPassword = defineSecret("SMTP_PASSWORD");
-const managerEmail = "sayedyassersy1@gmail.com";
+const managerAuthEmail = "sayedyassersy1@gmail.com";
+const monitoringSettingsRef = database.doc("systemSettings/monitoring");
 
 function requireSystemAdmin(request) {
     const email = String(request.auth?.token?.email || "").toLowerCase();
-    if (!request.auth || email !== managerEmail) {
+    if (!request.auth || email !== managerAuthEmail) {
         throw new HttpsError("permission-denied", "Only the system manager can manage branch accounts.");
     }
 }
@@ -71,12 +68,99 @@ export const setBranchAccountPassword = onCall({ region: "us-central1" }, async 
     }
 
     const user = await getBranchAccountUser(branchId);
-    if (String(user.email || "").toLowerCase() === managerEmail) {
+    if (String(user.email || "").toLowerCase() === managerAuthEmail) {
         throw new HttpsError("failed-precondition", "The system manager account cannot be changed as a branch account.");
     }
     await adminAuth.updateUser(user.uid, { password });
     await adminAuth.revokeRefreshTokens(user.uid);
     return { success: true };
+});
+
+export const updateBranchAccountEmail = onCall({ region: "us-central1" }, async request => {
+    requireSystemAdmin(request);
+    const branchId = request.data?.branchId;
+    const email = String(request.data?.email || "").trim().toLowerCase();
+    if (typeof branchId !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(branchId)) {
+        throw new HttpsError("invalid-argument", "A valid branch ID is required.");
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        throw new HttpsError("invalid-argument", "Provide a valid branch account email.");
+    }
+    if (email === managerAuthEmail) {
+        throw new HttpsError("failed-precondition", "The system manager email cannot be used as a branch account.");
+    }
+
+    let targetUser;
+    try {
+        targetUser = await adminAuth.getUserByEmail(email);
+    } catch (error) {
+        if (error.code === "auth/user-not-found") {
+            throw new HttpsError(
+                "not-found",
+                "الحساب ده مش موجود في Firebase Authentication. استخدم بريد حساب الفرع المسجل بالفعل."
+            );
+        }
+        console.error("Branch account email update failed.", {
+            branchId,
+            errorCode: error?.code || null,
+            errorMessage: error?.message || String(error)
+        });
+        throw new HttpsError("internal", "تعذر العثور على حساب الفرع. راجع سجلات Cloud Functions.");
+    }
+
+    if (String(targetUser.email || "").toLowerCase() === managerAuthEmail) {
+        throw new HttpsError("failed-precondition", "The system manager account cannot be linked as a branch account.");
+    }
+
+    const branchReference = database.collection("branches").doc(branchId);
+    const membershipCollection = database.collection("branchMemberships");
+    const targetMembershipReference = membershipCollection.doc(targetUser.uid);
+    const linked = await database.runTransaction(async transaction => {
+        const [branchSnapshot, currentMembershipsSnapshot, targetMembershipSnapshot] = await Promise.all([
+            transaction.get(branchReference),
+            transaction.get(membershipCollection.where("branchId", "==", branchId)),
+            transaction.get(targetMembershipReference)
+        ]);
+        if (!branchSnapshot.exists) throw new HttpsError("not-found", "The requested branch does not exist.");
+
+        const emailKeyword = String(branchSnapshot.data().emailKeyword || "").toLowerCase();
+        if (!emailKeyword || !email.includes(emailKeyword)) {
+            throw new HttpsError("invalid-argument", "The email must contain this branch's email keyword.");
+        }
+        const targetMembership = targetMembershipSnapshot.exists
+            ? targetMembershipSnapshot.data()
+            : null;
+        if (targetMembership?.branchId && targetMembership.branchId !== branchId) {
+            throw new HttpsError(
+                "failed-precondition",
+                "This account is already assigned to another branch and cannot be moved automatically."
+            );
+        }
+
+        const now = Date.now();
+        transaction.set(targetMembershipReference, {
+            branchId,
+            email,
+            active: true,
+            canAccessAdmin: targetMembership?.canAccessAdmin === true,
+            canEditCustomers: targetMembership?.canEditCustomers === true,
+            createdAt: targetMembership?.createdAt || now
+        });
+        const obsoleteMemberships = currentMembershipsSnapshot.docs.filter(
+            membership => membership.id !== targetUser.uid
+        );
+        obsoleteMemberships.forEach(membership => transaction.delete(membership.ref));
+        return {
+            relinked: obsoleteMemberships.length > 0
+                || !currentMembershipsSnapshot.docs.some(
+                    membership => membership.id === targetUser.uid
+                )
+                || String(targetMembership?.email || "").toLowerCase() !== email
+                || targetMembership?.active !== true
+        };
+    });
+
+    return { success: true, email, uid: targetUser.uid, relinked: linked.relinked };
 });
 
 function escapeHtml(value) {
@@ -92,45 +176,1158 @@ function escapeHtml(value) {
 export const notifyManagerOfBranchActivity = onDocumentCreated({
     database: "default",
     document: "branches/{branchId}/activityLogs/{logId}",
-    secrets: [smtpHost, smtpPort, smtpUser, smtpPassword]
+    retry: true
 }, async event => {
     const activity = event.data?.data();
     if (!activity || activity.notifyManager !== true) return;
-
-    const port = Number(smtpPort.value());
-    if (!Number.isInteger(port) || port < 1 || port > 65535) {
-        throw new Error("SMTP_PORT must be a valid TCP port.");
-    }
-
-    const transport = nodemailer.createTransport({
-        host: smtpHost.value(),
-        port,
-        secure: port === 465,
-        auth: {
-            user: smtpUser.value(),
-            pass: smtpPassword.value()
-        }
-    });
+    const monitoringSettingsSnapshot = await monitoringSettingsRef.get();
+    const monitoringSettings = {
+        outboundEnabled: true,
+        ...(monitoringSettingsSnapshot.data() || {})
+    };
+    if (monitoringSettings.outboundEnabled !== true) return;
     const details = [
-        `Branch: ${activity.branchName || event.params.branchId}`,
-        `Account: ${activity.actorEmail || activity.actorUid || "unknown"}`,
-        `Action: ${activity.action || "unknown"}`,
-        `Section: ${activity.collection || "unknown"}`,
-        `Record: ${activity.recordId || "—"}`,
-        `Device session: ${activity.deviceId || "unknown"}`,
-        `Event ID: ${event.params.logId}`
+        `الفرع: ${activity.branchName || event.params.branchId}`,
+        `الحساب: ${activity.actorEmail || activity.actorUid || "غير معروف"}`,
+        `النشاط: ${activity.action || "غير معروف"}`,
+        `القسم: ${activity.collection || "غير معروف"}`,
+        `السجل: ${activity.recordId || "—"}`,
+        `جلسة الجهاز: ${activity.deviceId || "غير معروف"}`,
+        `رقم المتابعة: ${event.params.logId}`
     ];
     const subjectBranch = String(activity.branchName || event.params.branchId).replace(/[\r\n]+/g, " ").slice(0, 100);
     const subjectAction = String(activity.action || "activity").replace(/[\r\n]+/g, " ").slice(0, 100);
-    const subject = `[Sama Phone] ${subjectBranch}: ${subjectAction}`;
+    const subject = `[سما فون] ${subjectBranch}: ${subjectAction}`;
     const text = details.join("\n");
     const html = `<ul>${details.map(detail => `<li>${escapeHtml(detail)}</li>`).join("")}</ul>`;
 
-    await transport.sendMail({
-        from: smtpUser.value(),
-        to: managerEmail,
-        subject,
-        text,
-        html
+    await saveManagerEmail(subject, text, html, {
+        id: `activity-${createHash("sha256").update(event.params.logId).digest("hex")}`,
+        category: "activity"
     });
+});
+
+const hourMilliseconds = 60 * 60 * 1000;
+const noticeReminderMilliseconds = 30 * 60 * 1000;
+const dailyLineLimit = 60000;
+const monthlyLineLimit = 200000;
+
+function parseRecordDate(value) {
+    if (value && typeof value.toDate === "function") return value.toDate();
+    if (value instanceof Date) return value;
+    const raw = String(value || "");
+    if (!raw) return null;
+    const normalized = raw.replace(" ", "T");
+    const hasTimezone = /[zZ]$|[+-]\d{2}:\d{2}$/.test(normalized);
+    const date = new Date(hasTimezone ? normalized : `${normalized}Z`);
+    return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function getCairoDateKey(date) {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Africa/Cairo",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit"
+    }).formatToParts(date);
+    const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+    return `${values.year}-${values.month}-${values.day}`;
+}
+
+function formatCurrency(value) {
+    return `${new Intl.NumberFormat("ar-EG", { maximumFractionDigits: 2 }).format(value)} ج`;
+}
+
+async function loadBranchMonitoringMetrics(branch, now) {
+    const branchId = branch.id;
+    const transactionsCollection = database.collection("branches").doc(branchId)
+        .collection("data").doc("transactions").collection("items");
+    const cutoff = new Date(now.getTime() - 24 * hourMilliseconds);
+    const [recentSnapshot, latestSnapshot, presenceSnapshot, settingsSnapshot] = await Promise.all([
+        Promise.all([
+            transactionsCollection.where("datetime", ">=", cutoff.toISOString()).get(),
+            transactionsCollection.where("datetime", ">=", cutoff).get()
+        ]),
+        transactionsCollection.orderBy("datetime", "desc").limit(1).get(),
+        database.collection("branchPresence").doc(branchId).collection("devices").get(),
+        database.collection("branches").doc(branchId).collection("settings").doc("system").get()
+    ]);
+
+    const transactionMap = new Map(recentSnapshot.flatMap(snapshot => snapshot.docs).map(document => [document.id, {
+        ...document.data(),
+        id: document.id,
+        parsedDate: parseRecordDate(document.data().datetime)
+    }]));
+    if (!latestSnapshot.empty) {
+        const document = latestSnapshot.docs[0];
+        transactionMap.set(document.id, {
+            ...latestSnapshot.docs[0].data(),
+            id: document.id,
+            parsedDate: parseRecordDate(document.data().datetime)
+        });
+    }
+    const allKnownTransactions = [...transactionMap.values()].filter(transaction => transaction.parsedDate);
+    const recentTransactions = allKnownTransactions.filter(transaction =>
+        transaction.parsedDate.getTime() >= cutoff.getTime()
+    );
+    const latestTransaction = allKnownTransactions.sort((left, right) =>
+        right.parsedDate.getTime() - left.parsedDate.getTime()
+    )[0] || null;
+    const activeDeviceRecords = presenceSnapshot.docs
+        .map(document => document.data())
+        .filter(device => device.deleted !== true
+            && device.enabled !== false
+            && Number(device.lastSeen) >= now.getTime() - 20 * 60 * 1000);
+    const activeSinceValues = activeDeviceRecords
+        .map(device => Number(device.firstSeenAt || device.createdAt || device.lastSeen))
+        .filter(Number.isFinite);
+    const activeSince = activeSinceValues.length ? Math.min(...activeSinceValues) : null;
+    const today = getCairoDateKey(now);
+    const todayTransactions = recentTransactions.filter(transaction =>
+        getCairoDateKey(transaction.parsedDate) === today
+    );
+    const transactions = todayTransactions.length;
+    const totalFees = todayTransactions.reduce((sum, transaction) => sum + (Number(transaction.fee) || 0), 0);
+    const depositVolume = todayTransactions
+        .filter(transaction => transaction.type === "deposit")
+        .reduce((sum, transaction) => sum + (Number(transaction.amount) || 0), 0);
+    const withdrawVolume = todayTransactions
+        .filter(transaction => transaction.type === "withdraw")
+        .reduce((sum, transaction) => sum + (Number(transaction.amount) || 0), 0);
+    const zeroFeeCount = recentTransactions.filter(transaction =>
+        Number(transaction.amount) > 0 && Number(transaction.fee) <= 0
+    ).length;
+    const highAmountCount = todayTransactions.filter(transaction => Number(transaction.amount) >= 10000).length;
+    const lastTransactionAt = latestTransaction?.parsedDate?.getTime() || null;
+    const idleSince = lastTransactionAt || activeSince;
+    const idleMinutes = idleSince
+        ? Math.max(0, Math.floor((now.getTime() - idleSince) / 60000))
+        : null;
+    const settings = settingsSnapshot.data() || {};
+    const pinnedLines = await Promise.all([
+        ["سحب", settings.pinnedWithdrawWalletId],
+        ["إيداع", settings.pinnedDepositWalletId]
+    ].filter(([, walletId]) => walletId).map(async ([label, walletId]) => {
+        const walletSnapshot = await database.collection("branches").doc(branchId)
+            .collection("data").doc("wallets").collection("items").doc(walletId).get();
+        if (!walletSnapshot.exists) return null;
+        const wallet = walletSnapshot.data();
+        return {
+            label,
+            walletId,
+            name: wallet.name || wallet.phone || "خط بدون اسم",
+            balance: Number(wallet.balance) || 0
+        };
+    }));
+
+    return {
+        branch,
+        branchId,
+        name: branch.name || branchId,
+        activeDevices: activeDeviceRecords.length,
+        recentTransactions,
+        transactions,
+        totalFees,
+        depositVolume,
+        withdrawVolume,
+        zeroFeeCount,
+        highAmountCount,
+        idleMinutes,
+        lastTransactionAt,
+        activeSince,
+        latestTransactionAt: latestTransaction?.parsedDate?.getTime() || null,
+        pinnedLines: pinnedLines.filter(Boolean)
+    };
+}
+
+function getBranchPerformanceStatus(metrics, ranking, totalBranches, now) {
+    const rank = ranking.findIndex(item => item.branchId === metrics.branchId) + 1;
+    const anyBranchHasTransactions = ranking[0]?.transactions > 0;
+    const isLast = rank > 0 && ranking.length > 1 && rank === ranking.length;
+    const kind = metrics.transactions === 0
+        ? anyBranchHasTransactions ? "slow" : "idle"
+        : rank === 1
+            ? "leader"
+            : isLast
+                ? "slow"
+                : rank === 2
+                    ? "second"
+                    : "steady";
+    const title = kind === "leader" ? "المتصدر اليوم"
+        : kind === "second" ? "المركز الثاني"
+            : kind === "slow" ? metrics.transactions === 0 ? "لم يبدأ بعد" : "محتاج دفعة"
+                : kind === "idle" ? "لم يبدأ بعد"
+                    : `المركز ${rank}`;
+    const leader = ranking[0];
+    const message = kind === "leader"
+        ? `إنتوا رقم 1 النهارده بـ${metrics.transactions} عملية وعمولات ${formatCurrency(metrics.totalFees)}. كملوا بنفس الحماس!`
+        : kind === "second"
+            ? `إنتوا في المركز التاني، ناقصكم ${Math.max(0, leader.transactions - metrics.transactions)} عملية وتوصلوا للصدارة. شدوا حيلكم!`
+            : kind === "slow"
+                ? metrics.transactions === 0
+                    ? "لسه مفيش ولا عملية النهارده. ابدأوا الشغل وإن شاء الله تلحقوا باقي الفروع!"
+                    : `إنتوا آخر الترتيب دلوقتي بـ${metrics.transactions} عملية. كل عملية هتقرّبكم من الفرع اللي قبلكم.`
+                : kind === "idle"
+                    ? metrics.activeDevices > 0
+                        ? "لسه مفيش عمليات النهارده مع إن جهاز الفرع متصل. اطمنوا إن الشغل ماشي."
+                        : "لسه مفيش عمليات متسجلة للفرع النهارده."
+                    : `إنتوا في المركز ${rank} بـ${metrics.transactions} عملية النهارده.`;
+    const businessDate = getCairoDateKey(now);
+    return {
+        eventId: `${businessDate}:${kind}:${rank}:${metrics.transactions}:${metrics.totalFees}`,
+        date: businessDate,
+        kind,
+        rank,
+        totalBranches,
+        title,
+        message,
+        transactions: metrics.transactions,
+        fees: metrics.totalFees,
+        updatedAt: now.getTime()
+    };
+}
+
+function getMonitoringNotice(metrics, performance, now) {
+    const recentZeroFeeTransactions = metrics.recentTransactions.filter(transaction =>
+        transaction.parsedDate.getTime() >= now.getTime() - 15 * 60 * 1000
+        && Number(transaction.amount) > 0
+        && Number(transaction.fee) <= 0
+    );
+    if (recentZeroFeeTransactions.length) {
+        const ids = recentZeroFeeTransactions.map(transaction => transaction.id).sort().join(",");
+        return {
+            type: "zero_fee",
+            fingerprint: `zero_fee:${ids.split(",")[0]}`,
+            severity: "warning",
+            message: `خدوا بالكم: فيه ${recentZeroFeeTransactions.length} عملية بمبلغ موجب من غير عمولة آخر 15 دقيقة. راجعوا العمولة قبل ما تكملوا.`
+        };
+    }
+    if (metrics.activeDevices > 0 && metrics.idleMinutes !== null && metrics.idleMinutes >= 30) {
+        const severity = metrics.idleMinutes >= 90
+            ? "critical"
+            : metrics.idleMinutes >= 60
+                ? "urgent"
+                : "warning";
+        const idleMessage = metrics.lastTransactionAt
+            ? `مفيش عمليات اتسجلت بقالها ${metrics.idleMinutes} دقيقة`
+            : `مفيش عمليات اتسجلت من بداية جلسة الفرع بقالها ${metrics.idleMinutes} دقيقة`;
+        const severityMessage = severity === "critical"
+            ? `تصعيد حرج: ${idleMessage} مع إن جهاز الفرع متصل. اتصل بالفرع فورًا وتأكد إن التشغيل سليم.`
+            : severity === "urgent"
+                ? `تحذير عاجل: ${idleMessage} مع إن جهاز الفرع متصل. تابع الفرع وسجل سبب التوقف.`
+                : `تنبيه: ${idleMessage} مع إن جهاز الفرع متصل. اطمنوا إن الشغل ماشي.`;
+        return {
+            type: "idle",
+            fingerprint: `idle:${metrics.latestTransactionAt || metrics.activeSince || "none"}`,
+            severity,
+            message: severityMessage
+        };
+    }
+    if (performance.kind === "leader") {
+        return {
+            type: "leader",
+            fingerprint: `leader:${performance.date}:${metrics.branchId}`,
+            severity: "success",
+            message: performance.message
+        };
+    }
+    if (performance.kind === "second"
+        || (performance.kind === "slow" && metrics.transactions > 0)) {
+        return {
+            type: performance.kind,
+            fingerprint: `${performance.kind}:${performance.date}:${metrics.branchId}`,
+            severity: performance.kind === "slow" ? "warning" : "notice",
+            message: performance.message
+        };
+    }
+    return null;
+}
+
+async function recordBranchMonitoringAlerts(
+    branchId,
+    branchName,
+    alerts,
+    now,
+    forceNotice = false,
+    publishCashierNotice = true
+) {
+    if (!alerts.length) return [];
+    const alertReferences = alerts.map(alert => {
+        const id = createHash("sha256")
+            .update(`${branchId}:${alert.fingerprint}`)
+            .digest("hex");
+        return {
+            ...alert,
+            id,
+            reference: database.collection("branches").doc(branchId)
+                .collection("monitoringAlerts").doc(id)
+        };
+    });
+    const communicationsRef = publishCashierNotice
+        ? database.collection("branches").doc(branchId).collection("settings").doc("communications")
+        : null;
+
+    return database.runTransaction(async transaction => {
+        const snapshots = await Promise.all([
+            ...alertReferences.map(alert => transaction.get(alert.reference)),
+            ...(communicationsRef ? [transaction.get(communicationsRef)] : [])
+        ]);
+        const newAlerts = alertReferences.filter((_, index) => !snapshots[index].exists);
+        const pendingEmailAlerts = alertReferences.filter((_, index) =>
+            !snapshots[index].exists
+            || !(snapshots[index].data()?.emailLoggedAt || snapshots[index].data()?.emailSentAt)
+        );
+        if (!newAlerts.length && !forceNotice) {
+            return pendingEmailAlerts.map(alert => ({ ...alert, isNew: false }));
+        }
+
+        newAlerts.forEach(alert => {
+            transaction.set(alert.reference, {
+                id: alert.id,
+                branchId,
+                branchName,
+                type: alert.type,
+                severity: alert.severity,
+                message: alert.message,
+                createdAt: now.getTime(),
+                fingerprint: alert.fingerprint
+            });
+        });
+        if (communicationsRef && (newAlerts.length || forceNotice)) {
+            const noticeAlerts = newAlerts.length ? newAlerts : alertReferences;
+            const newNotice = {
+                id: randomUUID(),
+                type: noticeAlerts[0].type,
+                severity: noticeAlerts.some(alert => alert.severity === "critical")
+                    ? "critical"
+                    : noticeAlerts.some(alert => alert.severity === "urgent")
+                        ? "urgent"
+                        : "warning",
+                fingerprint: noticeAlerts.map(alert => alert.fingerprint).join("|"),
+                message: noticeAlerts.map(alert => alert.message).join("\n"),
+                createdAt: now.getTime(),
+                reminderCount: 0,
+                lastReminderAt: now.getTime()
+            };
+            transaction.set(communicationsRef, {
+                assistantNotice: newNotice,
+                assistantNoticeRead: null
+            }, { merge: true });
+        }
+        return pendingEmailAlerts.map(alert => ({
+            ...alert,
+            isNew: newAlerts.some(newAlert => newAlert.id === alert.id)
+        }));
+    });
+}
+
+function getExpectedTransactionFee(transaction) {
+    const amount = Number(transaction.amount);
+    if (!Number.isFinite(amount) || amount <= 0) return null;
+    if (transaction.type === "deposit") return Math.max(0, Math.ceil(amount / 1000) * 5 - 1);
+    if (transaction.type === "withdraw") return Math.ceil(amount / 500) * 5;
+    return null;
+}
+
+async function monitorBranchTransaction(branchId, transactionId, transaction, previousTransaction = null) {
+    const settingsSnapshot = await monitoringSettingsRef.get();
+    const settings = {
+        outboundEnabled: true,
+        cashierInteractionEnabled: true,
+        ...(settingsSnapshot.data() || {})
+    };
+    if (settings.outboundEnabled !== true) return;
+
+    const amount = Number(transaction.amount);
+    const transactionDate = parseRecordDate(transaction.datetime);
+    const now = new Date();
+    if (!transactionDate || !Number.isFinite(amount) || amount <= 0
+        || transactionDate.getTime() > now.getTime() + 5 * 60 * 1000) return;
+
+    const branchReference = database.collection("branches").doc(branchId);
+    const walletId = typeof transaction.walletId === "string" ? transaction.walletId : "";
+    const [branchSnapshot, walletSnapshot] = await Promise.all([
+        branchReference.get(),
+        walletId
+            ? branchReference.collection("data").doc("wallets").collection("items").doc(walletId).get()
+            : Promise.resolve(null)
+    ]);
+    const branchName = branchSnapshot.data()?.name || branchId;
+    const alerts = [];
+    const expectedFee = getExpectedTransactionFee(transaction);
+    const actualFee = Number(transaction.fee) || 0;
+    const feeChanged = previousTransaction
+        && (Number(previousTransaction.fee) || 0) !== actualFee;
+    const transactionIsRecent = now.getTime() - transactionDate.getTime() <= 15 * 60 * 1000;
+
+    if (actualFee <= 0 && (transactionIsRecent || feeChanged)) {
+        alerts.push({
+            type: "zero_fee",
+            severity: "warning",
+            fingerprint: `zero_fee:${transactionId}`,
+            message: `مراجعة عمولة: عملية ${transaction.type === "deposit" ? "إيداع" : "سحب"} بمبلغ ${formatCurrency(amount)} اتسجلت من غير عمولة.`
+        });
+    } else if (expectedFee !== null
+        && (feeChanged || (transactionIsRecent && Math.abs(actualFee - expectedFee) > 0.001))) {
+        const previousFee = previousTransaction ? Number(previousTransaction.fee) || 0 : null;
+        const changeDetails = previousFee === null
+            ? `المسجل ${formatCurrency(actualFee)} والمتوقع ${formatCurrency(expectedFee)}`
+            : `اتغيرت من ${formatCurrency(previousFee)} لـ ${formatCurrency(actualFee)}؛ والمتوقع ${formatCurrency(expectedFee)}`;
+        alerts.push({
+            type: "commission_adjustment",
+            severity: "warning",
+            fingerprint: `commission:${transactionId}:${previousFee ?? "new"}:${actualFee}:${Number(transaction.amount)}:${transaction.type}`,
+            message: `مراجعة عمولة: ${changeDetails} في عملية ${transaction.type === "deposit" ? "إيداع" : "سحب"} بمبلغ ${formatCurrency(amount)}.`
+        });
+    }
+    if (transactionIsRecent && amount >= 10000) {
+        alerts.push({
+            type: "high_amount",
+            severity: "warning",
+            fingerprint: `high_amount:${transactionId}`,
+            message: `مراجعة مبلغ كبير: عملية ${transaction.type === "deposit" ? "إيداع" : "سحب"} بمبلغ ${formatCurrency(amount)} اتسجلت في فرع ${branchName}.`
+        });
+    }
+
+    const wallet = walletSnapshot?.data() || {};
+    const isLine = wallet.category === "line"
+        || String(wallet.type || "").toLowerCase() === "vodafone cash";
+    const currentCairoDate = getCairoDateKey(transactionDate);
+    if (isLine && currentCairoDate === getCairoDateKey(now)
+        && ["deposit", "withdraw"].includes(transaction.type)) {
+        const cutoff = new Date(now.getTime() - 35 * 24 * 60 * 60 * 1000);
+        const transactionsCollection = branchReference.collection("data")
+            .doc("transactions").collection("items");
+        const [stringDates, timestampDates] = await Promise.all([
+            transactionsCollection.where("walletId", "==", transaction.walletId)
+                .where("type", "==", transaction.type)
+                .where("datetime", ">=", cutoff.toISOString()).get(),
+            transactionsCollection.where("walletId", "==", transaction.walletId)
+                .where("type", "==", transaction.type)
+                .where("datetime", ">=", cutoff).get()
+        ]);
+        const recentTransactions = new Map();
+        [...stringDates.docs, ...timestampDates.docs].forEach(document => {
+            recentTransactions.set(document.id, document.data());
+        });
+        recentTransactions.set(transactionId, transaction);
+
+        const previous = previousTransaction
+            && previousTransaction.walletId === transaction.walletId
+            && previousTransaction.type === transaction.type
+            ? previousTransaction
+            : null;
+        const usedBefore = { daily: 0, monthly: 0 };
+        const usedAfter = { daily: 0, monthly: 0 };
+        for (const [id, record] of recentTransactions) {
+            if (id === transactionId) continue;
+            const date = parseRecordDate(record.datetime);
+            if (!date) continue;
+            const dateKey = getCairoDateKey(date);
+            const monthKey = dateKey.slice(0, 7);
+            const value = Math.max(0, Number(record.amount) || 0);
+            if (monthKey === currentCairoDate.slice(0, 7)) {
+                usedBefore.monthly += value;
+                usedAfter.monthly += value;
+            }
+            if (dateKey === currentCairoDate) {
+                usedBefore.daily += value;
+                usedAfter.daily += value;
+            }
+        }
+
+        if (previous) {
+            const previousDate = parseRecordDate(previous.datetime);
+            const previousAmount = Math.max(0, Number(previous.amount) || 0);
+            if (previousDate && getCairoDateKey(previousDate).slice(0, 7) === currentCairoDate.slice(0, 7)) {
+                usedBefore.monthly += previousAmount;
+            }
+            if (previousDate && getCairoDateKey(previousDate) === currentCairoDate) {
+                usedBefore.daily += previousAmount;
+            }
+        }
+        const currentAmount = Math.max(0, amount);
+        usedAfter.monthly += currentAmount;
+        usedAfter.daily += currentAmount;
+
+        const lineName = wallet.name || wallet.phone || transaction.walletId || "خط بدون اسم";
+        [
+            { period: "daily", label: "اليومي", limit: dailyLineLimit, date: currentCairoDate },
+            { period: "monthly", label: "الشهري", limit: monthlyLineLimit, date: currentCairoDate.slice(0, 7) }
+        ].forEach(({ period, label, limit, date }) => {
+            if (usedBefore[period] >= limit || usedAfter[period] < limit) return;
+            alerts.push({
+                type: "line_limit",
+                severity: "warning",
+                fingerprint: `line_limit:${transaction.walletId}:${transaction.type}:${period}:${date}`,
+                message: `تنبيه حد الخط: خط ${lineName} وصل للحد ${label} في ${transaction.type === "deposit" ? "الإيداع" : "السحب"} (${formatCurrency(limit)}).`
+            });
+        });
+    }
+
+    const pendingEmailAlerts = await recordBranchMonitoringAlerts(
+        branchId,
+        branchName,
+        alerts,
+        now,
+        false,
+        settings.cashierInteractionEnabled === true
+    );
+    if (pendingEmailAlerts.length) {
+        await savePendingMonitoringAlert(
+            pendingEmailAlerts.map(alert => ({ ...alert, branchName })),
+            now
+        );
+    }
+}
+
+async function updateBranchAssistantNotice(metrics, candidate, settings, now) {
+    const communicationsRef = database.collection("branches").doc(metrics.branchId)
+        .collection("settings").doc("communications");
+    const snapshot = await communicationsRef.get();
+    const data = snapshot.data() || {};
+    const existing = data.assistantNotice || null;
+    if (!candidate) {
+        if (existing?.type === "idle" && metrics.idleMinutes !== null && metrics.idleMinutes < 30) {
+            await communicationsRef.set({
+                assistantNotice: null,
+                assistantNoticeRead: null
+            }, { merge: true });
+        }
+        return null;
+    }
+    const acknowledged = data.assistantNoticeRead?.noticeId === existing?.id;
+    const noticeIncludesCandidate = String(existing?.fingerprint || "")
+        .split("|").includes(candidate.fingerprint);
+
+    if (!noticeIncludesCandidate) {
+        await recordBranchMonitoringAlerts(metrics.branchId, metrics.name, [candidate], now, true);
+        return null;
+    }
+
+    if (candidate.type === "idle") {
+        if (!settings.remindersEnabled) return null;
+        const reminderCount = Number(existing.reminderCount) || 0;
+        const lastReminderAt = Number(existing.lastReminderAt || existing.createdAt) || now.getTime();
+        const shouldRemindBranch = now.getTime() - lastReminderAt >= noticeReminderMilliseconds;
+        const severityChanged = existing.severity !== candidate.severity;
+        const contentChanged = existing.message !== candidate.message;
+        if (shouldRemindBranch || severityChanged || contentChanged) {
+            const nextReminderCount = reminderCount + (shouldRemindBranch ? 1 : 0);
+            const updatedNotice = {
+                ...existing,
+                ...candidate,
+                id: shouldRemindBranch || severityChanged ? randomUUID() : existing.id,
+                message: shouldRemindBranch
+                    ? `تذكير متابعة ${nextReminderCount}: ${candidate.message}`
+                    : candidate.message,
+                reminderCount: nextReminderCount,
+                lastReminderAt: shouldRemindBranch ? now.getTime() : lastReminderAt
+            };
+            await communicationsRef.set({
+                assistantNotice: updatedNotice,
+                ...(shouldRemindBranch || severityChanged ? { assistantNoticeRead: null } : {})
+            }, { merge: true });
+        }
+        return null;
+    }
+
+    if (existing.fingerprint === candidate.fingerprint
+        && Number(existing.reminderCount || 0) === 0
+        && existing.message !== candidate.message) {
+        await communicationsRef.set({
+            assistantNotice: { ...existing, message: candidate.message }
+        }, { merge: true });
+    }
+
+    if (!settings.remindersEnabled || acknowledged || existing.type === "leader") return null;
+    const reminderCount = Number(existing.reminderCount || 0);
+    if (reminderCount >= 2) {
+        return existing.managerNotifiedAt
+            ? null
+            : { branchId: metrics.branchId, branchName: metrics.name, message: candidate.message };
+    }
+    const lastNoticeTime = Number(existing.lastReminderAt || existing.createdAt) || now.getTime();
+    if (now.getTime() - lastNoticeTime < noticeReminderMilliseconds) return null;
+
+    const nextReminderCount = reminderCount + 1;
+    const message = nextReminderCount === 1
+        ? `تذكير 1 من 2: ${candidate.message}`
+        : `تذكير 2 من 2: ${candidate.message} تم إشعار الإدارة لمتابعة الحالة.`;
+    const updatedNotice = {
+        ...existing,
+        message,
+        reminderCount: nextReminderCount,
+        lastReminderAt: now.getTime()
+    };
+    await communicationsRef.set({ assistantNotice: updatedNotice }, { merge: true });
+    if (nextReminderCount === 2) {
+        return { branchId: metrics.branchId, branchName: metrics.name, message: candidate.message };
+    }
+    return null;
+}
+
+async function updateManagerIdleNotification(metrics, candidate, now) {
+    if (candidate?.type !== "idle") return null;
+    const alertId = createHash("sha256")
+        .update(`${metrics.branchId}:${candidate.fingerprint}`)
+        .digest("hex");
+    const alertReference = database.collection("branches").doc(metrics.branchId)
+        .collection("monitoringAlerts").doc(alertId);
+    const snapshot = await alertReference.get();
+    const existing = snapshot.data() || {};
+    if (!snapshot.exists) {
+        await alertReference.set({
+            id: alertId,
+            branchId: metrics.branchId,
+            branchName: metrics.name,
+            type: candidate.type,
+            severity: candidate.severity,
+            message: candidate.message,
+            createdAt: now.getTime(),
+            fingerprint: candidate.fingerprint,
+            managerNotificationCount: 0,
+            lastManagerNotificationAt: null
+        });
+    } else if (existing.severity !== candidate.severity || existing.message !== candidate.message) {
+        await alertReference.set({
+            severity: candidate.severity,
+            message: candidate.message
+        }, { merge: true });
+    }
+
+    const lastNotifiedAt = Number(
+        existing.lastManagerNotificationAt || existing.emailLoggedAt || existing.emailSentAt
+    ) || 0;
+    if (lastNotifiedAt && now.getTime() - lastNotifiedAt < noticeReminderMilliseconds) return null;
+    return {
+        type: "idle",
+        branchId: metrics.branchId,
+        branchName: metrics.name,
+        message: candidate.message,
+        idleMinutes: metrics.idleMinutes,
+        severity: candidate.severity,
+        alertId,
+        notificationNumber: (Number(existing.managerNotificationCount) || 0) + 1
+    };
+}
+
+export const monitorBranchTransactionCreated = onDocumentCreated({
+    database: "default",
+    document: "branches/{branchId}/data/transactions/items/{transactionId}",
+    retry: true
+}, async event => {
+    const transaction = event.data?.data();
+    if (!transaction) return;
+    await monitorBranchTransaction(event.params.branchId, event.params.transactionId, transaction);
+});
+
+export const monitorBranchTransactionUpdated = onDocumentUpdated({
+    database: "default",
+    document: "branches/{branchId}/data/transactions/items/{transactionId}",
+    retry: true
+}, async event => {
+    const transaction = event.data?.after.data();
+    const previousTransaction = event.data?.before.data();
+    if (!transaction || !previousTransaction) return;
+    await monitorBranchTransaction(
+        event.params.branchId,
+        event.params.transactionId,
+        transaction,
+        previousTransaction
+    );
+});
+
+function buildManagerReport(metrics, now) {
+    const ranked = [...metrics].sort((left, right) =>
+        right.transactions - left.transactions || right.totalFees - left.totalFees
+    );
+    const rows = ranked.map((item, index) => {
+        const lines = item.pinnedLines.map(line =>
+            `${line.label}: ${line.name} (${formatCurrency(line.balance)})`
+        ).join("، ") || "لا توجد خطوط مثبتة";
+        const idle = item.idleMinutes === null ? "لا توجد عملية مسجلة" : `آخر عملية منذ ${item.idleMinutes} دقيقة`;
+        return `${index + 1}. ${item.name}: ${item.transactions} عملية اليوم، عمولات ${formatCurrency(item.totalFees)}، إيداع ${formatCurrency(item.depositVolume)}، سحب ${formatCurrency(item.withdrawVolume)}، عمليات دون عمولة آخر 24 ساعة: ${item.zeroFeeCount}، عمليات مرتفعة (10,000 ج أو أكثر): ${item.highAmountCount}، ${idle}، أجهزة نشطة: ${item.activeDevices}. الخطوط: ${lines}.`;
+    });
+    const text = [
+        `تقرير Sama Phone — ${now.toLocaleString("ar-EG", { timeZone: "Africa/Cairo" })}`,
+        "ترتيب الفروع حسب عدد عمليات اليوم ثم العمولات:",
+        ...(rows.length ? rows : ["لا توجد فروع نشطة حاليًا."])
+    ].join("\n\n");
+    const htmlRows = ranked.map((item, index) => {
+        const lineInfo = item.pinnedLines.map(line =>
+            `${escapeHtml(line.label)}: ${escapeHtml(line.name)} (${escapeHtml(formatCurrency(line.balance))})`
+        ).join("<br>") || "لا توجد خطوط مثبتة";
+        const idle = item.idleMinutes === null ? "لا توجد عملية مسجلة" : `آخر عملية منذ ${item.idleMinutes} دقيقة`;
+        return `<tr><td>${index + 1}. ${escapeHtml(item.name)}</td><td>${item.transactions}</td><td>${escapeHtml(formatCurrency(item.totalFees))}</td><td>${escapeHtml(formatCurrency(item.depositVolume))}</td><td>${escapeHtml(formatCurrency(item.withdrawVolume))}</td><td>${item.zeroFeeCount}</td><td>${item.highAmountCount}</td><td>${escapeHtml(idle)}</td><td>${escapeHtml(lineInfo)}</td></tr>`;
+    }).join("");
+    const html = `<div dir="rtl"><h2>تقرير Sama Phone — ${escapeHtml(now.toLocaleString("ar-EG", { timeZone: "Africa/Cairo" }))}</h2><p>ترتيب الفروع حسب عدد عمليات اليوم ثم العمولات.</p><table border="1" cellpadding="8" cellspacing="0"><thead><tr><th>الترتيب والفرع</th><th>عمليات اليوم</th><th>العمولات</th><th>الإيداع</th><th>السحب</th><th>دون عمولة (24 ساعة)</th><th>مبالغ مرتفعة</th><th>آخر نشاط</th><th>الخطوط المثبتة وأرصدتها</th></tr></thead><tbody>${htmlRows}</tbody></table><p>تُحسب مبالغ العمليات المرتفعة ابتداءً من 10,000 ج. لا ينفذ النظام أي خصم تلقائي.</p></div>`;
+    return { text, html };
+}
+
+async function saveManagerEmail(subject, text, _html, options = {}) {
+    const emailReference = database.collection("managerEmails").doc(
+        options.id || randomUUID()
+    );
+    const existingEmail = await emailReference.get();
+    if (["sent", "saved"].includes(existingEmail.data()?.status)) {
+        return { id: emailReference.id, alreadySaved: true };
+    }
+
+    const createdAt = existingEmail.data()?.createdAt || Date.now();
+    await emailReference.set({
+        subject: String(subject).slice(0, 250),
+        text: String(text).slice(0, 60000),
+        recipient: "البريد الداخلي للنظام",
+        category: options.category || "report",
+        status: "saved",
+        deliveryMode: "internal",
+        createdAt,
+        savedAt: Date.now(),
+        errorCode: null,
+        errorMessage: null
+    }, { merge: true });
+
+    return { id: emailReference.id, savedAt: Date.now() };
+}
+
+async function savePendingMonitoringAlert(alerts, now) {
+    if (!alerts.length) return 0;
+    const text = [
+        `تنبيهات متابعة الفروع — ${now.toLocaleString("ar-EG", { timeZone: "Africa/Cairo" })}`,
+        ...alerts.map(alert => `${alert.branchName}: ${alert.message}`)
+    ].join("\n\n");
+    const html = `<div dir="rtl"><h2>تنبيهات متابعة الفروع</h2><p>${escapeHtml(now.toLocaleString("ar-EG", { timeZone: "Africa/Cairo" }))}</p><ul>${alerts.map(alert => `<li><strong>${escapeHtml(alert.branchName)}</strong>: ${escapeHtml(alert.message)}</li>`).join("")}</ul></div>`;
+    const emailId = `alerts-${createHash("sha256")
+        .update(alerts.map(alert => alert.id).sort().join(":"))
+        .digest("hex")}`;
+    await saveManagerEmail("[سما فون] تنبيه متابعة فرع", text, html, {
+        id: emailId,
+        category: "alert"
+    });
+    await Promise.all(alerts.map(alert => alert.reference.update({ emailLoggedAt: now.getTime() })));
+    return alerts.length;
+}
+
+async function collectManagerMonitoringAlerts(metrics, performances, now, settings) {
+    const results = await Promise.all(metrics.map(async item => {
+        const alerts = new Map();
+        const performanceNotice = getMonitoringNotice(item, performances.get(item.branchId), now);
+        if (performanceNotice && performanceNotice.type !== "zero_fee") {
+            alerts.set(performanceNotice.fingerprint, performanceNotice);
+        }
+
+        for (const transaction of item.recentTransactions) {
+            if (Number(transaction.amount) > 0 && Number(transaction.fee) <= 0) {
+                const alert = {
+                    type: "zero_fee",
+                    severity: "warning",
+                    fingerprint: `zero_fee:${transaction.id}`,
+                    message: `مراجعة عمولة: عملية ${transaction.type === "deposit" ? "إيداع" : "سحب"} بمبلغ ${formatCurrency(Number(transaction.amount))} اتسجلت من غير عمولة.`
+                };
+                alerts.set(alert.fingerprint, alert);
+            }
+            if (Number(transaction.amount) >= 10000
+                && getCairoDateKey(transaction.parsedDate) === getCairoDateKey(now)) {
+                const alert = {
+                    type: "high_amount",
+                    severity: "warning",
+                    fingerprint: `high_amount:${transaction.id}`,
+                    message: `مراجعة مبلغ كبير: عملية ${transaction.type === "deposit" ? "إيداع" : "سحب"} بمبلغ ${formatCurrency(Number(transaction.amount))} اتسجلت.`
+                };
+                alerts.set(alert.fingerprint, alert);
+            }
+        }
+
+        for (const pinnedLine of item.pinnedLines) {
+            if (!pinnedLine.walletId) continue;
+            const since = new Date(now.getTime() - 35 * 24 * hourMilliseconds);
+            const transactionsCollection = database.collection("branches").doc(item.branchId)
+                .collection("data").doc("transactions").collection("items");
+            const [stringDates, timestampDates] = await Promise.all([
+                transactionsCollection.where("walletId", "==", pinnedLine.walletId)
+                    .where("type", "==", pinnedLine.label === "إيداع" ? "deposit" : "withdraw")
+                    .where("datetime", ">=", since.toISOString()).get(),
+                transactionsCollection.where("walletId", "==", pinnedLine.walletId)
+                    .where("type", "==", pinnedLine.label === "إيداع" ? "deposit" : "withdraw")
+                    .where("datetime", ">=", since).get()
+            ]);
+            const lineTransactions = new Map();
+            [...stringDates.docs, ...timestampDates.docs].forEach(document =>
+                lineTransactions.set(document.id, document.data())
+            );
+            let dailyUsed = 0;
+            let monthlyUsed = 0;
+            const today = getCairoDateKey(now);
+            const currentMonth = today.slice(0, 7);
+            lineTransactions.forEach(record => {
+                const date = parseRecordDate(record.datetime);
+                if (!date) return;
+                const dateKey = getCairoDateKey(date);
+                const amount = Math.max(0, Number(record.amount) || 0);
+                if (dateKey.slice(0, 7) === currentMonth) monthlyUsed += amount;
+                if (dateKey === today) dailyUsed += amount;
+            });
+            [
+                { label: "اليومي", used: dailyUsed, limit: dailyLineLimit, date: today },
+                { label: "الشهري", used: monthlyUsed, limit: monthlyLineLimit, date: currentMonth }
+            ].forEach(({ label, used, limit, date }) => {
+                if (used < limit) return;
+                const fingerprint = `line_limit:${pinnedLine.walletId}:${pinnedLine.label}:${label}:${date}`;
+                alerts.set(fingerprint, {
+                    type: "line_limit",
+                    severity: "warning",
+                    fingerprint,
+                    message: `تنبيه حد الخط: خط ${pinnedLine.name} المثبت لـ${pinnedLine.label} وصل للحد ${label} (${formatCurrency(limit)}).`
+                });
+            });
+        }
+
+        const alertList = [...alerts.values()];
+        const pendingEmailAlerts = [];
+        for (let index = 0; index < alertList.length; index += 100) {
+            const batchAlerts = alertList.slice(index, index + 100);
+            pendingEmailAlerts.push(...await recordBranchMonitoringAlerts(
+                item.branchId,
+                item.name,
+                batchAlerts,
+                now,
+                false,
+                index === 0 && settings.cashierInteractionEnabled === true
+            ));
+        }
+        return { branchName: item.name, alerts: alertList, pendingEmailAlerts };
+    }));
+
+    return {
+        alerts: results.flatMap(result => result.alerts.map(alert => ({
+            ...alert,
+            branchName: result.branchName
+        }))),
+        pendingEmailAlerts: results.flatMap(result => result.pendingEmailAlerts.map(alert => ({
+            ...alert,
+            branchName: result.branchName
+        })))
+    };
+}
+
+async function runManagerMonitoringStage(stage, operation) {
+    try {
+        return await operation();
+    } catch (error) {
+        const errorCode = String(error?.code || "unknown").slice(0, 100);
+        console.error("Manual branch monitoring stage failed.", {
+            stage,
+            errorCode,
+            errorMessage: String(error?.message || "Unknown error").slice(0, 500)
+        });
+        if (error instanceof HttpsError) throw error;
+        throw new HttpsError(
+            "internal",
+            `تعذر إكمال الفحص في مرحلة: ${stage}.`,
+            { stage, errorCode }
+        );
+    }
+}
+
+export const runManagerMonitoringNow = onCall({
+    region: "us-central1",
+    timeoutSeconds: 300
+}, async request => {
+    requireSystemAdmin(request);
+    const now = new Date();
+    const settingsSnapshot = await runManagerMonitoringStage(
+        "تحميل إعدادات المتابعة",
+        () => monitoringSettingsRef.get()
+    );
+    const settings = {
+        reportsEnabled: true,
+        outboundEnabled: true,
+        cashierInteractionEnabled: true,
+        remindersEnabled: true,
+        ...(settingsSnapshot.data() || {})
+    };
+    const branchesSnapshot = await runManagerMonitoringStage(
+        "تحميل قائمة الفروع",
+        () => database.collection("branches").get()
+    );
+    const branches = branchesSnapshot.docs
+        .map(document => ({ id: document.id, ...document.data() }))
+        .filter(branch => branch.active !== false);
+    const metrics = await runManagerMonitoringStage(
+        "قراءة بيانات الفروع",
+        () => Promise.all(branches.map(branch => loadBranchMonitoringMetrics(branch, now)))
+    );
+    const ranking = [...metrics].sort((left, right) =>
+        right.transactions - left.transactions
+        || right.totalFees - left.totalFees
+        || left.name.localeCompare(right.name)
+    );
+    const performances = new Map(metrics.map(item => [
+        item.branchId,
+        getBranchPerformanceStatus(item, ranking, metrics.length, now)
+    ]));
+    await runManagerMonitoringStage("حفظ ترتيب الفروع", () =>
+        Promise.all(metrics.map(async item => {
+            const reference = database.collection("branches").doc(item.branchId)
+                .collection("settings").doc("communications");
+            await reference.set({ performanceStatus: performances.get(item.branchId) }, { merge: true });
+        }))
+    );
+
+    const scanSettings = {
+        ...settings,
+        cashierInteractionEnabled: settings.outboundEnabled === true
+            && settings.cashierInteractionEnabled === true
+    };
+    const scan = await runManagerMonitoringStage(
+        "فحص التنبيهات",
+        () => collectManagerMonitoringAlerts(metrics, performances, now, scanSettings)
+    );
+    const report = buildManagerReport(metrics, now);
+    const alertText = scan.alerts.length
+        ? scan.alerts.map(alert => `${alert.branchName}: ${alert.message}`).join("\n")
+        : "مفيش أخطاء أو تنبيهات محتاجة متابعة في الفحص ده.";
+    const motivational = ranking.filter(item => item.transactions > 0).map(item => {
+        const performance = performances.get(item.branchId);
+        return `${item.name}: ${performance.message}`;
+    }).join("\n");
+    const text = `${report.text}\n\nنتيجة المراجعة:\n${alertText}\n\nرسائل تحفيز الفروع النشطة:\n${motivational || "لسه مفيش عمليات مسجلة النهارده."}`;
+    const htmlAlerts = scan.alerts.map(alert =>
+        `<li><strong>${escapeHtml(alert.branchName)}</strong>: ${escapeHtml(alert.message)}</li>`
+    ).join("");
+    const htmlMotivation = ranking.filter(item => item.transactions > 0).map(item =>
+        `<li>${escapeHtml(item.name)}: ${escapeHtml(performances.get(item.branchId).message)}</li>`
+    ).join("");
+    const html = `${report.html}<div dir="rtl"><h2>نتيجة المراجعة</h2>${htmlAlerts ? `<ul>${htmlAlerts}</ul>` : "<p>مفيش أخطاء أو تنبيهات محتاجة متابعة في الفحص ده.</p>"}<h2>رسائل تحفيز الفروع النشطة</h2><ul>${htmlMotivation || "<li>لسه مفيش عمليات مسجلة النهارده.</li>"}</ul></div>`;
+
+    try {
+        const email = await saveManagerEmail("[سما فون] تقرير مراجعة الفروع", text, html, {
+            category: "manual_report"
+        });
+        let alertTrackingError = null;
+        try {
+            await Promise.all(scan.pendingEmailAlerts.map(alert =>
+                alert.reference.update({ emailLoggedAt: now.getTime() })
+            ));
+        } catch (error) {
+            alertTrackingError = String(error?.code || "alert_tracking_failed").slice(0, 100);
+            console.error("Manual report was saved, but alert logging state could not be updated.", {
+                errorCode: alertTrackingError
+            });
+        }
+        return {
+            branchesChecked: branches.length,
+            alertsFound: scan.alerts.length,
+            emailSaved: true,
+            emailId: email.id,
+            recipient: "البريد الداخلي للنظام",
+            alertTrackingError,
+            completedAt: now.getTime()
+        };
+    } catch (error) {
+        console.error("Manual branch report could not be saved to the internal mailbox.", {
+            errorCode: error?.code || null
+        });
+        return {
+            branchesChecked: branches.length,
+            alertsFound: scan.alerts.length,
+            emailSaved: false,
+            message: "تم الفحص، لكن تعذر حفظ التقرير في صفحة البريد. راجع سجلات Cloud Functions.",
+            emailErrorCode: error?.code || "mailbox_save_failed"
+        };
+    }
+});
+
+export const sendManagerEmailTest = onCall({
+    region: "us-central1",
+    timeoutSeconds: 60
+}, async request => {
+    requireSystemAdmin(request);
+    const now = new Date();
+    const savedAtLabel = now.toLocaleString("ar-EG", { timeZone: "Africa/Cairo" });
+    let email;
+    try {
+        email = await saveManagerEmail(
+            "[سما فون] اختبار رسالة البريد الداخلي",
+            `دي رسالة اختبار محفوظة داخل بريد النظام فقط.\nوقت الحفظ: ${savedAtLabel}\nلم يتم إرسالها إلى أي بريد خارجي.`,
+            `<div dir="rtl"><h2>اختبار البريد الداخلي</h2><p>دي رسالة اختبار محفوظة داخل بريد النظام فقط.</p><p>وقت الحفظ: ${escapeHtml(savedAtLabel)}</p><p>لم يتم إرسالها إلى أي بريد خارجي.</p></div>`,
+            { category: "test" }
+        );
+    } catch (error) {
+        const errorCode = String(error?.code || "mailbox_save_failed").slice(0, 100);
+        console.error("Internal mailbox test entry could not be saved.", { errorCode });
+        throw new HttpsError(
+            "internal",
+            `تعذر حفظ رسالة الاختبار في سجل البريد (${errorCode}).`
+        );
+    }
+    return {
+        emailId: email.id,
+        recipient: "البريد الداخلي للنظام",
+        savedAt: email.savedAt || now.getTime()
+    };
+});
+
+export const runScheduledBranchMonitoring = onSchedule({
+    schedule: "every 15 minutes",
+    timeZone: "Africa/Cairo",
+    timeoutSeconds: 300,
+    maxInstances: 1
+}, async () => {
+    const now = new Date();
+    const branchesSnapshot = await database.collection("branches").get();
+    const activeBranches = branchesSnapshot.docs
+        .map(document => ({ id: document.id, ...document.data() }))
+        .filter(branch => branch.active !== false);
+    const metrics = await Promise.all(activeBranches.map(branch => loadBranchMonitoringMetrics(branch, now)));
+    const ranking = [...metrics].sort((left, right) =>
+        right.transactions - left.transactions
+        || right.totalFees - left.totalFees
+        || left.name.localeCompare(right.name)
+    );
+    const performanceStatuses = new Map(metrics.map(item => [
+        item.branchId,
+        getBranchPerformanceStatus(item, ranking, metrics.length, now)
+    ]));
+    await Promise.all(metrics.map(async item => {
+        const communicationsRef = database.collection("branches").doc(item.branchId)
+            .collection("settings").doc("communications");
+        const snapshot = await communicationsRef.get();
+        const existingStatus = snapshot.data()?.performanceStatus;
+        const nextStatus = performanceStatuses.get(item.branchId);
+        if (existingStatus?.eventId === nextStatus?.eventId
+            && existingStatus?.transactions === nextStatus?.transactions
+            && existingStatus?.fees === nextStatus?.fees
+            && existingStatus?.message === nextStatus?.message) return;
+        await communicationsRef.set({ performanceStatus: nextStatus }, { merge: true });
+    }));
+    const escalations = [];
+
+    const latestSettingsSnapshot = await monitoringSettingsRef.get();
+    const latestSettings = {
+        reportsEnabled: true,
+        outboundEnabled: true,
+        cashierInteractionEnabled: true,
+        remindersEnabled: true,
+        ...(latestSettingsSnapshot.data() || {})
+    };
+    if (latestSettings.outboundEnabled !== true) return;
+
+    for (const branchMetrics of metrics) {
+        const candidate = getMonitoringNotice(
+            branchMetrics,
+            performanceStatuses.get(branchMetrics.branchId),
+            now
+        );
+        if (latestSettings.cashierInteractionEnabled === true) {
+            const escalation = await updateBranchAssistantNotice(branchMetrics, candidate, latestSettings, now);
+            if (escalation) escalations.push(escalation);
+        }
+        if (latestSettings.remindersEnabled === true) {
+            const idleNotification = await updateManagerIdleNotification(branchMetrics, candidate, now);
+            if (idleNotification) escalations.push(idleNotification);
+        }
+    }
+    const idleEscalations = escalations.filter(item => item.type === "idle");
+    const otherEscalations = escalations.filter(item => item.type !== "idle");
+
+    const emailSettingsSnapshot = await monitoringSettingsRef.get();
+    const emailSettings = {
+        reportsEnabled: true,
+        outboundEnabled: true,
+        remindersEnabled: true,
+        ...(emailSettingsSnapshot.data() || {})
+    };
+    if (emailSettings.outboundEnabled === true && emailSettings.reportsEnabled === true && otherEscalations.length) {
+        const text = otherEscalations
+            .map(item => `${item.branchName}: لم يؤكد الفرع استلام التنبيه بعد تذكيرين.\n${item.message}`)
+            .join("\n\n");
+        const html = `<div dir="rtl"><h2>متابعة مطلوبة من المدير</h2>${otherEscalations.map(item => `<p><strong>${escapeHtml(item.branchName)}</strong>: لم يؤكد الفرع استلام التنبيه بعد تذكيرين.<br>${escapeHtml(item.message)}</p>`).join("")}</div>`;
+        try {
+            await saveManagerEmail("[Sama Phone] متابعة فروع تتطلب مراجعتك", text, html);
+            await Promise.all(otherEscalations.map(item => database.collection("branches").doc(item.branchId)
+                .collection("settings").doc("communications")
+                .update({ "assistantNotice.managerNotifiedAt": now.getTime() })));
+        } catch (error) {
+            console.error("Manager escalation email failed.", {
+                errorCode: error?.code || "mailbox_save_failed"
+            });
+        }
+    }
+
+    if (emailSettings.outboundEnabled === true
+        && emailSettings.remindersEnabled === true
+        && idleEscalations.length) {
+        await Promise.all(idleEscalations.map(async item => {
+            const severityLabel = item.severity === "critical"
+                ? "تصعيد حرج"
+                : item.severity === "urgent"
+                    ? "تحذير عاجل"
+                    : "تنبيه";
+            const subject = `[سما فون] ${severityLabel}: لا توجد عمليات في ${item.branchName}`;
+            const text = [
+                `الفرع: ${item.branchName}`,
+                `مدة التوقف: ${item.idleMinutes} دقيقة دون تسجيل عملية`,
+                `الحالة: ${severityLabel}`,
+                item.message,
+                "يرجى الاتصال بالفرع ومراجعة سبب التوقف."
+            ].join("\n\n");
+            const html = `<div dir="rtl"><h2>${escapeHtml(severityLabel)}</h2><p><strong>الفرع:</strong> ${escapeHtml(item.branchName)}</p><p><strong>مدة التوقف:</strong> ${item.idleMinutes} دقيقة دون تسجيل عملية</p><p>${escapeHtml(item.message)}</p><p>يرجى الاتصال بالفرع ومراجعة سبب التوقف.</p></div>`;
+            const emailId = `idle-${createHash("sha256")
+                .update(`${item.branchId}:${item.alertId}:${item.notificationNumber}`)
+                .digest("hex")}`;
+            try {
+                await saveManagerEmail(subject, text, html, {
+                    id: emailId,
+                    category: "idle_alert"
+                });
+                await database.collection("branches").doc(item.branchId)
+                    .collection("monitoringAlerts").doc(item.alertId)
+                    .update({
+                        lastManagerNotificationAt: now.getTime(),
+                        managerNotificationCount: item.notificationNumber,
+                        emailLoggedAt: now.getTime()
+                    });
+            } catch (error) {
+                console.error("Idle branch manager notification failed.", {
+                    branchId: item.branchId,
+                    alertId: item.alertId,
+                    emailId,
+                    errorCode: error?.code || "mailbox_save_failed"
+                });
+            }
+        }));
+    }
+
+    if (emailSettings.reportsEnabled !== true) return;
+    const previousReportAt = Number(emailSettings.lastReportAt) || 0;
+    const inFlightAt = Number(emailSettings.reportInFlightAt) || 0;
+    if (now.getTime() - previousReportAt < hourMilliseconds
+        || (inFlightAt && now.getTime() - inFlightAt < 10 * 60 * 1000)) return;
+
+    const claimed = await database.runTransaction(async transaction => {
+        const currentSnapshot = await transaction.get(monitoringSettingsRef);
+        const current = currentSnapshot.data() || {};
+        const lastSent = Number(current.lastReportAt) || 0;
+        const currentClaim = Number(current.reportInFlightAt) || 0;
+        if (current.outboundEnabled !== true || current.reportsEnabled !== true
+            || now.getTime() - lastSent < hourMilliseconds
+            || (currentClaim && now.getTime() - currentClaim < 10 * 60 * 1000)) return false;
+        transaction.set(monitoringSettingsRef, { reportInFlightAt: now.getTime() }, { merge: true });
+        return true;
+    });
+    if (!claimed) return;
+
+    try {
+        const report = buildManagerReport(metrics, now);
+        await saveManagerEmail("[Sama Phone] تقرير متابعة الفروع كل ساعة", report.text, report.html);
+        await monitoringSettingsRef.set({
+            lastReportAt: now.getTime(),
+            reportInFlightAt: null
+        }, { merge: true });
+    } catch (error) {
+        await monitoringSettingsRef.set({ reportInFlightAt: null }, { merge: true });
+        throw error;
+    }
 });

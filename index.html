@@ -122,14 +122,13 @@
                             <input type="checkbox" x-model="rememberFirebaseSession" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
                             <span>تذكرني وتعبئة الدخول تلقائيًا</span>
                         </label>
-                        <button type="button" @click="resetFirebasePassword()" :disabled="firebaseBusy" class="text-xs font-bold text-blue-600 hover:text-blue-800 disabled:opacity-50">نسيت كلمة المرور؟</button>
+                        <span class="text-xs font-bold text-slate-500">لو نسيت كلمة المرور، تواصل مع المدير لإعادة تعيينها.</span>
                     </div>
                     <p x-show="firebaseAuthError" x-text="firebaseAuthError" role="alert" class="firebase-error-notice text-sm font-bold"></p>
                     <details x-show="firebaseErrorDetails" class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left">
                         <summary class="cursor-pointer text-xs font-bold text-slate-500">تفاصيل الخطأ</summary>
                         <p x-text="firebaseErrorDetails" dir="ltr" class="mt-2 break-all text-[11px] text-slate-500"></p>
                     </details>
-                    <p x-show="firebaseResetStatus" x-text="firebaseResetStatus" role="status" class="text-sm font-bold text-emerald-700"></p>
                     <button type="submit" :disabled="firebaseBusy" class="w-full rounded-xl bg-slate-900 py-3.5 font-extrabold text-white shadow-lg shadow-blue-900/10 transition hover:-translate-y-0.5 hover:shadow-blue-900/20 disabled:opacity-60" x-text="firebaseBusy ? 'جاري تسجيل الدخول...' : 'دخول'"></button>
                     <p class="login-manager-contact">
                         <i data-lucide="message-circle" aria-hidden="true"></i>
@@ -163,7 +162,7 @@
     </div>
 
     <!-- TOP HEADER -->
-    <header x-show="firebaseDataReady" x-cloak :inert="!appOnline" class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm no-print">
+    <header x-show="firebaseDataReady" x-cloak :inert="!appOnline" :class="currentMode === 'admin' && isSystemAdmin && adminTab === 'branches' && managerSettingsUnlocked ? 'is-manager-branches-header' : ''" class="app-top-header bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm no-print">
         <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col gap-3 md:flex-row md:justify-between md:items-center">
             <div class="flex min-w-0 items-center gap-3">
                 <div class="branch-mark flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-white">
@@ -192,8 +191,7 @@
                     <span x-text="darkMode ? 'الوضع النهاري' : 'الوضع الليلي'"></span>
                 </button>
                 <span x-show="firebaseAuthError" x-text="firebaseAuthError" role="alert" class="max-w-48 text-[10px] font-bold text-rose-600"></span>
-                <button x-show="isSystemAdmin && firebaseDataReady" @click="openBranchSettings()" class="rounded-xl bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100">إعدادات الفروع</button>
-                <button x-show="isSystemAdmin && currentBranch" @click="returnToBranchManagement()" class="rounded-xl bg-violet-50 px-3 py-2 text-xs font-bold text-violet-700 hover:bg-violet-100">تغيير الفرع</button>
+                <button x-show="isSystemAdmin && currentBranch" @click="returnToBranchManagement()" class="rounded-xl bg-violet-50 px-3 py-2 text-xs font-bold text-violet-700 hover:bg-violet-100">الرجوع للوحة الإدارة العامة</button>
                 <button @click="signOutFirebase()" class="flex items-center gap-1.5 rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-extrabold text-rose-700 hover:bg-rose-100">
                     <i data-lucide="log-out" class="h-3.5 w-3.5"></i> تسجيل الخروج
                 </button>
@@ -205,31 +203,105 @@
                 </template>
                 <template x-if="currentMode === 'admin'">
                     <div class="flex items-center gap-2">
-                        <button x-show="currentBranch" @click="currentMode = 'cashier'" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 transition shadow">
+                        <button x-show="currentBranch && !isSystemAdmin" @click="currentMode = 'cashier'" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 transition shadow">
                             <i data-lucide="shopping-cart" class="w-4 h-4"></i>
                             واجهة الكاشير
                         </button>
-                        <button x-show="currentBranch" @click="logoutAdmin()" class="rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100">
+                        <button x-show="currentBranch && !isSystemAdmin" @click="logoutAdmin()" class="rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100">
                             إنهاء وضع الإدارة
                         </button>
                     </div>
                 </template>
             </div>
         </div>
+        <section x-show="currentMode === 'admin' && isSystemAdmin && adminTab === 'branches' && managerSettingsUnlocked && managerAdminPage === 'branches' && managedBranches.length" class="manager-header-shortcuts">
+            <div class="manager-header-shortcuts-inner">
+                <span class="manager-header-shortcuts-label"><i data-lucide="zap"></i>فتح فرع</span>
+                <div class="manager-header-shortcuts-list">
+                    <template x-for="branch in managedBranches" :key="'header-quick-open-' + branch.id">
+                        <button @click="openManagedBranch(branch)" :disabled="!branch.account?.active || branch.active === false" class="manager-header-shortcut">
+                            <span class="shortcut-status" :class="branch.account?.active && branch.active !== false ? 'is-active' : ''" aria-hidden="true"></span>
+                            <span class="manager-header-shortcut-name" x-text="branch.name"></span>
+                            <span x-show="branch.communication?.performanceStatus?.title" class="manager-header-shortcut-rank" x-text="branch.communication?.performanceStatus?.title"></span>
+                        </button>
+                    </template>
+                </div>
+            </div>
+        </section>
     </header>
 
-    <aside x-show="firebaseDataReady && currentBranch?.communication?.globalAnnouncement?.message && globalAnnouncementDismissedId !== currentBranch.communication.globalAnnouncement.id" x-cloak aria-live="polite" class="global-announcement mx-auto mt-3 flex max-w-7xl items-start justify-between gap-3 rounded-2xl px-4 py-3 text-sm shadow-sm">
+    <details x-show="firebaseDataReady && currentBranch && currentMode === 'cashier'" x-cloak class="branch-rank-dropdown no-print" :class="['rank-' + (currentBranch?.communication?.performanceStatus?.kind || 'idle'), branchPerformanceCueActive ? 'is-celebrating' : '']">
+        <summary>
+            <i :data-lucide="currentBranch?.communication?.performanceStatus?.kind === 'leader' ? 'trophy' : currentBranch?.communication?.performanceStatus?.kind === 'slow' ? 'trending-down' : 'activity'"></i>
+            <span x-text="currentBranch?.communication?.performanceStatus?.kind === 'leader' ? 'إنتوا رقم 1 النهارده' : currentBranch?.communication?.performanceStatus?.kind === 'second' ? 'إنتوا المركز التاني' : currentBranch?.communication?.performanceStatus?.kind === 'slow' ? 'محتاجين تشدوا حيلكم' : currentBranch?.communication?.performanceStatus ? 'ترتيبكم النهارده' : 'بنحدّث ترتيب الفرع'"></span>
+            <span class="branch-rank-dropdown-position" x-show="currentBranch?.communication?.performanceStatus?.rank" x-text="'المركز ' + currentBranch?.communication?.performanceStatus?.rank + ' من ' + currentBranch?.communication?.performanceStatus?.totalBranches"></span>
+            <span class="branch-rank-dropdown-count" x-show="currentBranch?.communication?.performanceStatus" x-text="(currentBranch?.communication?.performanceStatus?.transactions || 0) + ' عملية النهارده'"></span>
+            <i class="branch-rank-dropdown-chevron" data-lucide="chevron-down"></i>
+        </summary>
+        <div class="branch-rank-dropdown-content" x-show="currentBranch?.communication?.performanceStatus">
+            <p class="branch-rank-dropdown-message" x-text="currentBranch?.communication?.performanceStatus?.message"></p>
+            <div class="branch-rank-dropdown-stats">
+                <span><strong x-text="currentBranch?.communication?.performanceStatus?.transactions || 0"></strong> عملية النهارده</span>
+                <span><strong x-text="formatMoney(currentBranch?.communication?.performanceStatus?.fees || 0)"></strong> عمولات</span>
+                <span>آخر تحديث <strong x-text="currentBranch?.communication?.performanceStatus?.updatedAt ? new Date(currentBranch.communication.performanceStatus.updatedAt).toLocaleTimeString('ar-EG', { hour: 'numeric', minute: '2-digit' }) : '—'"></strong></span>
+            </div>
+        </div>
+        <p x-show="!currentBranch?.communication?.performanceStatus" class="branch-rank-dropdown-pending">أول ما يوصلنا تحديث المتابعة، ترتيبك هيظهر هنا. لو اتأخر، خلي المدير يراجع تحديث النظام.</p>
+    </details>
+
+    <div x-show="firebaseDataReady && currentBranch" x-cloak class="branch-notification-stack no-print">
+    <aside x-show="currentBranch?.announcement?.id && branchAnnouncementDismissedId !== currentBranch.announcement.id" aria-live="polite" class="global-announcement flex items-start justify-between gap-3 rounded-2xl px-4 py-3 text-sm shadow-sm">
         <div class="flex items-start gap-2">
             <i data-lucide="megaphone" class="mt-0.5 h-4 w-4 shrink-0"></i>
             <div>
-                <p class="mb-1 text-[10px] font-black uppercase tracking-wide">رسالة عامة من الإدارة — لكل الفروع</p>
+                <p class="mb-1 text-[10px] font-black uppercase tracking-wide">رسالة خاصة بفرعكم من الإدارة</p>
+                <p class="whitespace-pre-wrap font-bold" x-text="currentBranch?.announcement?.message"></p>
+            </div>
+        </div>
+        <button @click="dismissBranchAnnouncement()" class="shrink-0 rounded-lg bg-white/80 px-2.5 py-1 text-xs font-bold">إخفاء</button>
+    </aside>
+
+    <aside x-show="currentBranch?.communication?.assistantNotice?.id && currentBranch.communication.assistantNoticeRead?.noticeId !== currentBranch.communication.assistantNotice.id" aria-live="polite" :class="'assistant-notice kind-' + (currentBranch?.communication?.assistantNotice?.type || 'notice') + ' severity-' + (currentBranch?.communication?.assistantNotice?.severity || 'warning')" class="flex items-start justify-between gap-3 rounded-2xl px-4 py-3 text-sm shadow-sm">
+        <div class="flex min-w-0 items-start gap-3">
+            <span class="assistant-notice-icon"><i :data-lucide="currentBranch?.communication?.assistantNotice?.type === 'leader' ? 'trophy' : 'message-circle-warning'"></i></span>
+            <div class="min-w-0">
+                <p class="mb-1 text-[10px] font-black uppercase tracking-wide" x-text="currentBranch?.communication?.assistantNotice?.type === 'leader' ? 'إنجاز الفرع' : 'متابعة ذكية من الإدارة'"></p>
+                <p class="whitespace-pre-wrap font-bold" x-text="currentBranch?.communication?.assistantNotice?.message"></p>
+                <p x-show="assistantNoticeError" x-text="assistantNoticeError" role="alert" class="mt-1 text-xs font-bold text-rose-700"></p>
+            </div>
+        </div>
+        <button @click="acknowledgeAssistantNotice()" :disabled="assistantNoticeBusy" class="shrink-0 rounded-lg bg-white/80 px-3 py-1.5 text-xs font-extrabold disabled:opacity-50" x-text="assistantNoticeBusy ? 'جارٍ التأكيد...' : 'تم، فهمت'"></button>
+    </aside>
+
+    <aside x-show="currentBranch?.communication?.globalAnnouncement?.message && currentBranch.communication.globalAnnouncement.displayMode !== 'popup' && globalAnnouncementDismissedId !== currentBranch.communication.globalAnnouncement.id" aria-live="polite" :class="'global-announcement severity-' + (currentBranch?.communication?.globalAnnouncement?.severity || 'info')" class="flex items-start justify-between gap-3 rounded-2xl px-4 py-3 text-sm shadow-sm">
+        <div class="flex items-start gap-2">
+            <i data-lucide="megaphone" class="mt-0.5 h-4 w-4 shrink-0"></i>
+            <div>
+                <p class="mb-1 text-[10px] font-black uppercase tracking-wide">رسالة من الإدارة</p>
                 <p class="whitespace-pre-wrap font-bold" x-text="currentBranch?.communication?.globalAnnouncement?.message"></p>
             </div>
         </div>
-        <button @click="globalAnnouncementDismissedId = currentBranch.communication.globalAnnouncement.id" class="shrink-0 rounded-lg bg-white/80 px-2.5 py-1 text-xs font-bold">إخفاء</button>
+        <button @click="dismissGlobalAnnouncement()" class="shrink-0 rounded-lg bg-white/80 px-2.5 py-1 text-xs font-bold">إخفاء</button>
     </aside>
 
-    <aside x-show="firebaseDataReady && currentBranch?.communication?.globalPoll?.question" x-cloak aria-live="polite" class="global-poll-card mx-auto mt-3 max-w-7xl rounded-2xl p-4 shadow-sm">
+    <div x-show="currentBranch?.communication?.globalAnnouncement?.message && currentBranch.communication.globalAnnouncement.displayMode === 'popup' && globalAnnouncementDismissedId !== currentBranch.communication.globalAnnouncement.id" class="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/75 p-4" role="alertdialog" aria-modal="true" aria-labelledby="urgentBranchMessageTitle">
+        <section class="urgent-message-modal" :class="'severity-' + (currentBranch?.communication?.globalAnnouncement?.severity || 'urgent')">
+            <div class="flex items-center gap-3">
+                <span class="urgent-message-icon"><i data-lucide="triangle-alert"></i></span>
+                <div>
+                    <p class="text-[10px] font-black uppercase tracking-widest opacity-70">تنبيه من الإدارة</p>
+                    <h2 id="urgentBranchMessageTitle" class="text-lg font-black">يرجى الانتباه</h2>
+                </div>
+            </div>
+            <div class="urgent-message-body">
+                <p class="urgent-message-body-label">محتوى التنبيه</p>
+                <p class="urgent-message-copy" x-text="currentBranch?.communication?.globalAnnouncement?.message"></p>
+            </div>
+            <button @click="dismissGlobalAnnouncement()" class="urgent-message-confirm">تم، فهمت</button>
+        </section>
+    </div>
+
+    <aside x-show="currentBranch?.communication?.globalPoll?.question && currentBranch.communication.pollResponse?.pollId !== currentBranch.communication.globalPoll.id" aria-live="polite" class="global-poll-card rounded-2xl p-4 shadow-sm">
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="flex items-start gap-2">
                 <i data-lucide="circle-help" class="mt-0.5 h-5 w-5 shrink-0"></i>
@@ -247,52 +319,58 @@
         </div>
         <p x-show="globalPollResponseError" x-text="globalPollResponseError" role="alert" class="mt-2 text-xs font-bold text-rose-700"></p>
     </aside>
-
-    <aside x-show="firebaseDataReady && currentBranch?.announcement?.message && branchAnnouncementDismissedId !== currentBranch.announcement.id" x-cloak class="mx-auto mt-3 flex max-w-7xl items-start justify-between gap-3 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-950 shadow-sm">
-        <div class="flex items-start gap-2">
-            <i data-lucide="megaphone" class="mt-0.5 h-4 w-4 shrink-0 text-violet-700"></i>
-            <p class="whitespace-pre-wrap font-bold" x-text="currentBranch?.announcement?.message"></p>
-        </div>
-        <button @click="branchAnnouncementDismissedId = currentBranch.announcement.id" class="shrink-0 rounded-lg bg-white px-2.5 py-1 text-xs font-bold text-violet-800">إخفاء</button>
-    </aside>
+    </div>
 
     <!-- MAIN CONTENT CONTAINER -->
-    <main x-show="firebaseDataReady" x-cloak :inert="!appOnline" class="flex-1 max-w-7xl w-full mx-auto p-3 md:p-5">
+    <main x-show="firebaseDataReady" x-cloak :inert="!appOnline" :class="currentMode === 'cashier' ? 'cashier-main' : ''" class="flex-1 max-w-7xl w-full mx-auto p-3 md:p-5">
 
         <!-- ==================== 1. CASHIER VIEW (واجهة الكاشير) ==================== -->
         <template x-if="firebaseDataReady && currentMode === 'cashier'">
-        <div class="space-y-4">
-            
+        <div class="cashier-dashboard space-y-3">
             <!-- FAST STATS STRIP -->
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+            <div class="stats-strip-grid grid grid-cols-2 md:grid-cols-3 gap-2">
+                <div class="bg-white p-2 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
                     <div>
-                        <p class="text-xs text-slate-500 font-bold">المحافظ والخطوط</p>
-                        <p class="text-lg font-black text-blue-600 num-en" x-text="wallets.length + ' خط/ماكينة'"></p>
+                        <p class="text-xs text-slate-500 font-bold">الماكينات</p>
+                        <p class="text-lg font-black text-blue-600 num-en" x-text="getWalletsByCategory('machine').length + ' ماكينة'"></p>
                     </div>
-                    <div class="p-2 bg-blue-50 text-blue-600 rounded-lg"><i data-lucide="smartphone" class="w-5 h-5"></i></div>
+                    <div class="p-1.5 bg-blue-50 text-blue-600 rounded-lg"><i data-lucide="cpu" class="w-4 h-4"></i></div>
                 </div>
-                <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                <div class="bg-white p-2 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-slate-500 font-bold">خطوط المحافظ</p>
+                        <p class="text-lg font-black text-cyan-700 num-en" x-text="getWalletsByCategory('line').length + ' خط'"></p>
+                    </div>
+                    <div class="p-1.5 bg-cyan-50 text-cyan-700 rounded-lg"><i data-lucide="smartphone" class="w-4 h-4"></i></div>
+                </div>
+                <div class="bg-white p-2 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-slate-500 font-bold">حسابات إنستا باي</p>
+                        <p class="text-lg font-black text-violet-700 num-en" x-text="getWalletsByCategory('instapay').length + ' حساب'"></p>
+                    </div>
+                    <div class="p-1.5 bg-violet-50 text-violet-700 rounded-lg"><i data-lucide="landmark" class="w-4 h-4"></i></div>
+                </div>
+                <div class="bg-white p-2 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
                     <div>
                         <p class="text-xs text-slate-500 font-bold">المتوقع بالدرج</p>
                         <p class="text-lg font-black text-emerald-600 num-en" x-text="formatMoney(calculateExpectedDrawerCash()) + ' ج'"></p>
                     </div>
-                    <div class="p-2 bg-emerald-50 text-emerald-600 rounded-lg"><i data-lucide="wallet" class="w-5 h-5"></i></div>
+                    <div class="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg"><i data-lucide="wallet" class="w-4 h-4"></i></div>
                 </div>
-                <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                <div class="bg-white p-2 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
                     <div>
                         <p class="text-xs text-slate-500 font-bold">أرباح الشيفت</p>
                         <p x-show="!shouldHideDailyFees" :class="shouldBlurDailyFees ? 'blur-sm select-none' : ''" class="text-lg font-black text-amber-600 num-en" x-text="formatMoney(calculateCurrentShiftProfit()) + ' ج'"></p>
                         <p x-show="shouldHideDailyFees" class="text-sm font-bold text-slate-400">مخفية بواسطة الإدارة</p>
                     </div>
-                    <div class="p-2 bg-amber-50 text-amber-600 rounded-lg"><i data-lucide="trending-up" class="w-5 h-5"></i></div>
+                    <div class="p-1.5 bg-amber-50 text-amber-600 rounded-lg"><i data-lucide="trending-up" class="w-4 h-4"></i></div>
                 </div>
-                <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                <div class="bg-white p-2 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
                     <div>
-                        <p class="text-xs text-slate-500 font-bold">عمليات اليوم</p>
+                        <p class="text-xs text-slate-500 font-bold" x-text="'العمليات ' + getTransactionPeriodLabel()"></p>
                         <p class="text-lg font-black text-purple-600 num-en" x-text="getTodayTransactions().length + ' عملية'"></p>
                     </div>
-                    <div class="p-2 bg-purple-50 text-purple-600 rounded-lg"><i data-lucide="receipt" class="w-5 h-5"></i></div>
+                    <div class="p-1.5 bg-purple-50 text-purple-600 rounded-lg"><i data-lucide="receipt" class="w-4 h-4"></i></div>
                 </div>
             </div>
 
@@ -332,7 +410,7 @@
                             <span class="bg-emerald-100 text-emerald-800 font-bold px-3 py-1 rounded-full text-sm flex items-center gap-1">
                                 <i data-lucide="arrow-down-left" class="w-4 h-4"></i> إيداع (العميل يدفع كاش)
                             </span>
-                            <span class="text-xs font-bold text-slate-400">عمولة شرائح تلقائية، بعد خصم 1 ج • قابلة للتعديل</span>
+                            <span class="text-xs font-bold text-slate-400" x-text="canEditTransactionCommission ? 'عمولة تلقائية • قابلة للتعديل' : 'عمولة تلقائية • التعديل مقفول من الإدارة'"></span>
                         </div>
 
                         <!-- LINE SELECT & PIN -->
@@ -368,8 +446,8 @@
                                     <input type="number" min="0" x-model.number="cashierDeposit.amount" @input="calculateDepositFee()" @keydown="handleCashierWorkflowKeydown($event, 'deposit')" data-cashier-step="amount" placeholder="0.00" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-base font-black text-slate-800 num-en focus:ring-2 focus:ring-emerald-500">
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-bold text-slate-600 mb-1">العمولة (تُحسب تلقائيًا وقابلة للتعديل):</label>
-                                    <input type="number" min="0" x-model.number="cashierDeposit.fee" @keydown="handleCashierWorkflowKeydown($event, 'deposit')" data-cashier-step="fee" class="w-full bg-emerald-50 border border-emerald-300 rounded-xl p-2.5 text-base font-black text-emerald-800 num-en focus:ring-2 focus:ring-emerald-500">
+                                    <label class="block text-xs font-bold text-slate-600 mb-1" x-text="canEditTransactionCommission ? 'العمولة (تُحسب تلقائيًا ويمكن تعديلها):' : 'العمولة (تلقائية ومقفولة):'"></label>
+                                    <input type="number" min="0" x-model.number="cashierDeposit.fee" :disabled="!canEditTransactionCommission" @keydown="handleCashierWorkflowKeydown($event, 'deposit')" data-cashier-step="fee" class="w-full bg-emerald-50 border border-emerald-300 rounded-xl p-2.5 text-base font-black text-emerald-800 num-en focus:ring-2 focus:ring-emerald-500 disabled:cursor-not-allowed disabled:opacity-60">
                                 </div>
                             </div>
 
@@ -425,7 +503,7 @@
                             <span class="shrink-0 whitespace-nowrap rounded-full bg-rose-100 px-3 py-1 text-xs font-bold text-rose-800 flex items-center gap-1 sm:text-sm">
                                 <i data-lucide="arrow-up-right" class="h-4 w-4 shrink-0"></i> سحب (تحويل للمحفظة)
                             </span>
-                            <span class="text-xs font-bold text-slate-400">عمولة شرائح تلقائية حسب المبلغ • قابلة للتعديل</span>
+                            <span class="text-xs font-bold text-slate-400" x-text="canEditTransactionCommission ? 'عمولة شرائح تلقائية • قابلة للتعديل' : 'عمولة تلقائية • التعديل مقفول من الإدارة'"></span>
                         </div>
 
                         <!-- LINE SELECT & PIN -->
@@ -461,8 +539,8 @@
                                     <input type="number" min="0" x-model.number="cashierWithdraw.amount" @input="calculateWithdrawFee()" @keydown="handleCashierWorkflowKeydown($event, 'withdraw')" data-cashier-step="amount" placeholder="0.00" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-base font-black text-slate-800 num-en focus:ring-2 focus:ring-rose-500">
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-bold text-slate-600 mb-1">العمولة (تُحسب تلقائيًا وقابلة للتعديل):</label>
-                                    <input type="number" min="0" x-model.number="cashierWithdraw.fee" @keydown="handleCashierWorkflowKeydown($event, 'withdraw')" data-cashier-step="fee" class="w-full bg-rose-50 border border-rose-300 rounded-xl p-2.5 text-base font-black text-rose-800 num-en focus:ring-2 focus:ring-rose-500">
+                                    <label class="block text-xs font-bold text-slate-600 mb-1" x-text="canEditTransactionCommission ? 'العمولة (تُحسب تلقائيًا ويمكن تعديلها):' : 'العمولة (تلقائية ومقفولة):'"></label>
+                                    <input type="number" min="0" x-model.number="cashierWithdraw.fee" :disabled="!canEditTransactionCommission" @keydown="handleCashierWorkflowKeydown($event, 'withdraw')" data-cashier-step="fee" class="w-full bg-rose-50 border border-rose-300 rounded-xl p-2.5 text-base font-black text-rose-800 num-en focus:ring-2 focus:ring-rose-500 disabled:cursor-not-allowed disabled:opacity-60">
                                 </div>
                             </div>
 
@@ -491,7 +569,7 @@
             <div class="space-y-3">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <h3 class="font-extrabold text-slate-800 text-base flex items-center gap-2">
-                        <i data-lucide="history" class="w-5 h-5 text-blue-600"></i> سجل عمليات اليوم
+                        <i data-lucide="history" class="w-5 h-5 text-blue-600"></i><span x-text="'سجل العمليات ' + getTransactionPeriodLabel()"></span>
                     </h3>
                     <input type="search" x-model="cashierSearch" placeholder="بحث برقم العميل أو المحفظة..." class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold sm:w-72">
                 </div>
@@ -501,7 +579,7 @@
                             <div class="flex items-center justify-between border-b border-slate-100 px-4 py-3">
                                 <h4 class="flex items-center gap-2 text-sm font-extrabold" :class="type === 'deposit' ? 'text-emerald-700' : 'text-rose-700'">
                                     <span class="h-2 w-2 rounded-full" :class="type === 'deposit' ? 'bg-emerald-500' : 'bg-rose-500'"></span>
-                                    <span x-text="type === 'deposit' ? 'إيداعات اليوم' : 'سحوبات اليوم'"></span>
+                                    <span x-text="(type === 'deposit' ? 'إيداعات ' : 'سحوبات ') + getTransactionPeriodLabel()"></span>
                                 </h4>
                                 <span class="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-extrabold text-slate-600" x-text="getFilteredTodayTransactions(type).length + ' عملية'"></span>
                             </div>
@@ -545,7 +623,7 @@
         <div class="space-y-4">
             
             <!-- ADMIN NAVIGATION TABS -->
-            <div class="bg-white p-2 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap gap-2">
+            <div x-show="currentBranch || !isSystemAdmin" class="bg-white p-2 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap gap-2">
                 <button x-show="currentBranch" @click="adminTab = 'closing'" :class="adminTab === 'closing' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'" class="px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 transition">
                     <i data-lucide="calculator" class="w-4 h-4"></i> 1. تقفيل اليوم والتسوية
                 </button>
@@ -567,15 +645,36 @@
                 <button x-show="currentBranch" @click="adminTab = 'backup'" :class="adminTab === 'backup' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'" class="px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 transition">
                     <i data-lucide="database" class="w-4 h-4"></i> 7. النسخ الاحتياطي
                 </button>
-                <button x-show="isSystemAdmin" @click="openBranchSettings()" :class="adminTab === 'branches' ? 'bg-blue-700 text-white' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'" class="px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 transition">
-                    <i data-lucide="settings" class="w-4 h-4"></i> إعدادات الفروع
-                </button>
             </div>
 
             <template x-if="adminTab === 'branches' && isSystemAdmin">
             <section class="space-y-4">
                 <div x-show="managerSettingsUnlocked" class="space-y-5">
-                <div class="rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white p-5 shadow-sm">
+                <div class="manager-branch-sticky-header">
+                    <nav class="manager-page-nav" aria-label="أقسام إدارة النظام">
+                        <button @click="openManagerPage('branches')" :class="managerAdminPage === 'branches' ? 'is-active' : ''"><i data-lucide="store"></i> الفروع وإعداداتها</button>
+                        <button @click="openManagerPage('communications')" :class="managerAdminPage === 'communications' ? 'is-active' : ''"><i data-lucide="messages-square"></i> الرسائل والأسئلة</button>
+                        <button @click="openManagerPage('backup')" :class="managerAdminPage === 'backup' ? 'is-active' : ''"><i data-lucide="database"></i> النسخ الاحتياطي</button>
+                        <button @click="openManagerPage('insights')" :class="managerAdminPage === 'insights' ? 'is-active' : ''"><i data-lucide="activity"></i> المتابعة الذكية</button>
+                        <button @click="openManagerPage('emails')" :class="managerAdminPage === 'emails' ? 'is-active' : ''"><i data-lucide="mail"></i> البريد المرسل</button>
+                    </nav>
+                </div>
+                <p x-show="managerStatus" x-text="managerStatus" role="status" class="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-bold text-emerald-800"></p>
+                <div x-show="managerNotice" role="status" class="flex items-start justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-bold text-amber-800">
+                    <div class="min-w-0">
+                        <p x-text="managerNotice"></p>
+                        <details x-show="managerNoticeDetails" class="mt-2 text-xs">
+                            <summary class="cursor-pointer">تفاصيل الاتصال</summary>
+                            <p x-text="managerNoticeDetails" dir="ltr" class="mt-1 break-all font-mono"></p>
+                        </details>
+                    </div>
+                    <button @click="managerNotice = ''; managerNoticeDetails = ''" aria-label="إخفاء التنبيه" class="shrink-0 rounded-lg bg-white px-2 py-1 text-xs">إخفاء</button>
+                </div>
+                <div x-show="managerError" role="alert" class="flex items-start justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-bold text-rose-700">
+                    <p x-text="managerError" class="whitespace-pre-wrap"></p>
+                    <button @click="managerError = ''" aria-label="إخفاء الخطأ" class="shrink-0 rounded-lg bg-white px-2 py-1 text-xs">إخفاء</button>
+                </div>
+                <div x-show="managerAdminPage === 'backup'" class="rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white p-5 shadow-sm">
                     <div class="flex flex-wrap items-center justify-between gap-3">
                         <div>
                             <h2 class="text-lg font-extrabold text-blue-950">إدارة الفروع وحساباتها</h2>
@@ -594,43 +693,340 @@
                         </label>
                     </div>
                     <p class="mt-3 text-xs leading-5 text-amber-900">الاستعادة تستبدل بيانات الفروع المحددة وإعداداتها وصلاحيات الحسابات، ولا تستعيد كلمات المرور أو سجل النشاط.</p>
-                    <p x-show="managerStatus" x-text="managerStatus" role="status" class="mt-2 rounded-lg bg-emerald-50 p-2 text-sm font-bold text-emerald-700"></p>
-                    <p x-show="managerError" x-text="managerError" role="alert" class="mt-2 whitespace-pre-wrap rounded-lg bg-rose-50 p-2 text-sm font-bold text-rose-700"></p>
                 </div>
-                <section class="grid gap-4 xl:grid-cols-2" aria-label="الرسائل والاستطلاعات العامة">
-                    <form @submit.prevent="publishGlobalAnnouncement()" class="global-admin-message rounded-2xl p-4 shadow-sm">
-                        <div class="mb-3 flex items-center gap-2">
-                            <i data-lucide="megaphone" class="h-5 w-5"></i>
-                            <div>
-                                <h3 class="font-extrabold">رسالة عامة لكل الفروع</h3>
-                                <p class="text-xs opacity-80">تظهر أعلى رسالة الفرع الفردية بلون أحمر.</p>
-                            </div>
+                <section x-show="managerAdminPage === 'communications'" class="space-y-4" aria-label="إدارة رسائل الفروع">
+                    <form @submit.prevent="publishManagerCommunication()" class="manager-composer rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                        <div class="mb-4">
+                            <h3 class="text-lg font-black text-slate-900">إرسال رسالة أو سؤال</h3>
+                            <p class="mt-1 text-xs font-semibold text-slate-500">اختر نوع المحتوى والفرع، ثم حدّد طريقة ظهور الرسالة.</p>
                         </div>
-                        <textarea x-model="globalAnnouncementForm" rows="3" maxlength="2000" required placeholder="اكتب إعلانًا أو تنبيهًا يظهر لجميع الفروع..." class="w-full rounded-xl border border-rose-200 bg-white p-3 text-sm font-bold text-slate-800"></textarea>
-                        <div class="mt-2 flex flex-wrap items-center justify-between gap-2">
-                            <span class="text-[11px] font-bold" x-text="globalAnnouncementForm.length + ' / 2000'"></span>
-                            <div class="flex gap-2">
-                                <button type="submit" :disabled="managerBusy || !managedBranches.length" class="rounded-xl bg-rose-700 px-4 py-2 text-xs font-extrabold text-white disabled:opacity-50" x-text="managerBusy ? 'جاري الإرسال...' : 'إرسال لكل الفروع'"></button>
-                                <button type="button" @click="clearGlobalAnnouncement()" :disabled="managerBusy || !managedBranches.length" class="rounded-xl border border-rose-300 bg-white px-3 py-2 text-xs font-extrabold text-rose-800 disabled:opacity-50">حذف الرسالة العامة</button>
+                        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                            <label class="text-xs font-extrabold text-slate-600">نوع المحتوى
+                                <select x-model="managerMessageForm.kind" class="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5">
+                                    <option value="message">رسالة</option>
+                                    <option value="question">سؤال بنعم أو لا</option>
+                                </select>
+                            </label>
+                            <label class="text-xs font-extrabold text-slate-600">إرسال إلى
+                                <select x-model="managerMessageForm.target" class="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5">
+                                    <option value="all">كل الفروع</option>
+                                    <option value="branch">فرع محدد</option>
+                                </select>
+                            </label>
+                            <label x-show="managerMessageForm.target === 'branch'" class="text-xs font-extrabold text-slate-600">الفرع
+                                <select x-model="managerMessageForm.branchId" :required="managerMessageForm.target === 'branch'" class="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5">
+                                    <option value="">اختر الفرع</option>
+                                    <template x-for="branch in managedBranches" :key="'message-target-' + branch.id"><option :value="branch.id" x-text="branch.name"></option></template>
+                                </select>
+                            </label>
+                            <label x-show="managerMessageForm.kind === 'message'" class="text-xs font-extrabold text-slate-600">طريقة الظهور
+                                <select x-model="managerMessageForm.displayMode" class="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5">
+                                    <option value="inline">رسالة عادية داخل الصفحة</option>
+                                    <option value="popup">نافذة طارئة تتطلب التأكيد</option>
+                                </select>
+                            </label>
+                            <label x-show="managerMessageForm.kind === 'message'" class="text-xs font-extrabold text-slate-600">لون التنبيه
+                                <select x-model="managerMessageForm.severity" class="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5">
+                                    <option value="info">أزرق — معلومات</option>
+                                    <option value="success">أخضر — نجاح</option>
+                                    <option value="warning">برتقالي — تنبيه</option>
+                                    <option value="urgent">أحمر — طارئ</option>
+                                </select>
+                            </label>
+                        </div>
+                        <label class="mt-3 block text-xs font-extrabold text-slate-600">نص الرسالة أو السؤال
+                            <textarea x-model="managerMessageForm.text" rows="4" :maxlength="managerMessageForm.kind === 'question' ? 1000 : 2000" required class="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm font-bold" placeholder="اكتب المحتوى هنا..."></textarea>
+                        </label>
+                        <div class="mt-3 flex flex-wrap items-center justify-between gap-2">
+                            <span class="text-[11px] font-bold text-slate-500" x-text="managerMessageForm.text.length + ' / ' + (managerMessageForm.kind === 'question' ? 1000 : 2000)"></span>
+                            <div class="flex flex-wrap gap-2">
+                                <button type="submit" :disabled="managerBusy || !managedBranches.length" class="rounded-xl bg-indigo-700 px-5 py-2.5 text-xs font-extrabold text-white disabled:opacity-50" x-text="managerBusy ? 'جارٍ الإرسال...' : (managerMessageForm.kind === 'question' ? 'إرسال السؤال' : 'إرسال الرسالة')"></button>
+                                <button type="button" @click="deleteAllBranchQuestions()" :disabled="managerBusy || !managedBranches.length" class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs font-extrabold text-amber-800 disabled:opacity-50">حذف كل الأسئلة فقط</button>
+                                <button type="button" @click="clearAllManagerCommunications()" :disabled="managerBusy || !managedBranches.length" class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-extrabold text-rose-700 disabled:opacity-50">حذف كل الرسائل والأسئلة</button>
                             </div>
                         </div>
                     </form>
-                    <form @submit.prevent="publishGlobalPoll()" class="global-admin-poll rounded-2xl p-4 shadow-sm">
-                        <div class="mb-3 flex items-center gap-2">
-                            <i data-lucide="circle-help" class="h-5 w-5"></i>
-                            <div>
-                                <h3 class="font-extrabold">سؤال بنعم أو لا لكل الفروع</h3>
-                                <p class="text-xs opacity-80">كل إجابة جديدة تستبدل الإجابات السابقة على السؤال الجديد.</p>
-                            </div>
+                    <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                        <div class="border-b border-slate-100 p-4">
+                            <h3 class="font-extrabold text-slate-900">إجابات آخر سؤال حسب الفرع</h3>
+                            <p class="mt-1 text-xs text-slate-500">تتحدّث الإجابات تلقائيًا عند رد أي فرع.</p>
                         </div>
-                        <textarea x-model="globalPollForm" rows="3" maxlength="1000" required placeholder="اكتب السؤال الذي تريد إرساله للفروع..." class="w-full rounded-xl border border-indigo-200 bg-white p-3 text-sm font-bold text-slate-800"></textarea>
-                        <div class="mt-2 flex flex-wrap items-center justify-between gap-2">
-                            <span class="text-[11px] font-bold" x-text="globalPollForm.length + ' / 1000'"></span>
-                            <button type="submit" :disabled="managerBusy || !managedBranches.length" class="rounded-xl bg-indigo-700 px-4 py-2 text-xs font-extrabold text-white disabled:opacity-50" x-text="managerBusy ? 'جاري الإرسال...' : 'إرسال السؤال للجميع'"></button>
+                        <div class="overflow-x-auto">
+                            <table class="w-full min-w-[560px] text-right text-xs">
+                                <thead class="bg-slate-50 text-slate-500"><tr><th class="p-3">الفرع</th><th class="p-3">السؤال</th><th class="p-3">الإجابة</th><th class="p-3">وقت الرد</th><th class="p-3">إجراء</th></tr></thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    <template x-for="branch in managedBranches" :key="'poll-answer-' + branch.id">
+                                        <tr>
+                                            <td class="p-3 font-extrabold text-slate-800" x-text="branch.name"></td>
+                                            <td class="max-w-md p-3 text-slate-600" x-text="branch.communication?.globalPoll?.question || 'لا يوجد سؤال نشط'"></td>
+                                            <td class="p-3">
+                                                <span x-show="branch.communication?.pollResponse?.pollId === branch.communication?.globalPoll?.id && branch.communication?.globalPoll?.id" class="rounded-full px-2.5 py-1 font-extrabold" :class="branch.communication?.pollResponse?.answer === 'yes' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'" x-text="branch.communication?.pollResponse?.answer === 'yes' ? 'نعم' : 'لا'"></span>
+                                                <span x-show="branch.communication?.globalPoll?.id && branch.communication?.pollResponse?.pollId !== branch.communication?.globalPoll?.id" class="font-bold text-amber-700">بانتظار الرد</span>
+                                                <span x-show="!branch.communication?.globalPoll?.id" class="font-bold text-slate-400">—</span>
+                                            </td>
+                                            <td class="p-3 text-slate-500 num-en" x-text="branch.communication?.pollResponse?.respondedAt ? new Date(branch.communication.pollResponse.respondedAt).toLocaleString('ar-EG') : '—'"></td>
+                                            <td class="p-3"><button x-show="branch.communication?.globalPoll?.id" @click="deleteBranchQuestion(branch)" :disabled="managerBusy" class="rounded-lg bg-rose-50 px-2.5 py-1.5 font-bold text-rose-700 disabled:opacity-50">حذف السؤال</button></td>
+                                        </tr>
+                                    </template>
+                                    <tr x-show="managedBranches.length === 0"><td colspan="5" class="p-5 text-center text-slate-400">لا توجد فروع بعد.</td></tr>
+                                </tbody>
+                            </table>
                         </div>
-                    </form>
+                    </section>
                 </section>
-                <form @submit.prevent="createBranchFromManager()" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+
+                <section x-show="managerAdminPage === 'insights'" class="space-y-4">
+                    <section class="grid gap-3 rounded-2xl border border-indigo-100 bg-white p-4 shadow-sm md:grid-cols-2 xl:grid-cols-3" aria-label="إعدادات المتابعة الذكية">
+                        <div class="md:col-span-2 xl:col-span-3">
+                            <h3 class="font-extrabold text-slate-900">إعدادات المتابعة والتنبيهات</h3>
+                            <p class="mt-1 text-xs leading-5 text-slate-500">تقارير المدير الدورية كل ساعة. عند توقف العمليات، يظهر للفرع تذكير كل 30 دقيقة وتُحفظ لك رسالة في البريد الداخلي؛ يتصاعد التنبيه بعد 60 دقيقة ويصبح حرجًا بعد 90 دقيقة. لا تُرسل رسائل إلى بريد خارجي.</p>
+                        </div>
+                        <label class="flex items-start gap-3 rounded-xl bg-slate-50 p-3 text-xs font-bold text-slate-700">
+                            <input type="checkbox" :checked="managerMonitoringSettings.reportsEnabled" @change="saveManagerMonitoringSettings('reportsEnabled', $event.target.checked)" :disabled="managerBusy || !managerMonitoringLoaded" class="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600">
+                            <span>تقارير البريد الداخلي كل ساعة<strong class="mt-1 block text-[10px] font-semibold text-slate-500">ترتيب الفروع، الأرباح، العمليات الكبيرة ودون عمولة، النشاط وأرصدة الخطوط.</strong></span>
+                        </label>
+                        <label class="flex items-start gap-3 rounded-xl bg-rose-50 p-3 text-xs font-bold text-rose-800">
+                            <input type="checkbox" :checked="managerMonitoringSettings.outboundEnabled" @change="saveManagerMonitoringSettings('outboundEnabled', $event.target.checked)" :disabled="managerBusy || !managerMonitoringLoaded" class="mt-0.5 h-4 w-4 rounded border-rose-300 text-rose-600">
+                            <span>السماح بتسجيل الرسائل الآلية<strong class="mt-1 block text-[10px] font-semibold text-rose-700">أوقفه لمنع النظام من إنشاء سجلات التنبيهات والتقارير في البريد الداخلي.</strong></span>
+                        </label>
+                        <label class="flex items-start gap-3 rounded-xl bg-blue-50 p-3 text-xs font-bold text-blue-800">
+                            <input type="checkbox" :checked="managerMonitoringSettings.cashierInteractionEnabled" @change="saveManagerMonitoringSettings('cashierInteractionEnabled', $event.target.checked)" :disabled="managerBusy || !managerMonitoringLoaded" class="mt-0.5 h-4 w-4 rounded border-blue-300 text-blue-600">
+                            <span>تفاعل المتابعة مع شاشة الكاشير<strong class="mt-1 block text-[10px] font-semibold text-blue-700">تنبيه فوري للعمولة الصفرية أو المعدلة، بلوغ حد الخط، والمبالغ الكبيرة؛ بلا صوت أو خصومات.</strong></span>
+                        </label>
+                        <label class="flex items-start gap-3 rounded-xl bg-amber-50 p-3 text-xs font-bold text-amber-800">
+                            <input type="checkbox" :checked="managerMonitoringSettings.remindersEnabled" @change="saveManagerMonitoringSettings('remindersEnabled', $event.target.checked)" :disabled="managerBusy || !managerMonitoringLoaded" class="mt-0.5 h-4 w-4 rounded border-amber-300 text-amber-600">
+                            <span>تذكير توقف العمليات كل 30 دقيقة<strong class="mt-1 block text-[10px] font-semibold text-amber-700">تنبيه عند 30 دقيقة، تصعيد عند 60، وحالة حرجة بعد 90؛ تُسجل رسالة في البريد الداخلي مع كل تذكير حتى يسجل الفرع عملية.</strong></span>
+                        </label>
+                        <label class="space-y-1.5 rounded-xl bg-slate-50 p-3 text-xs font-bold text-slate-700">تحديث لوحة المتابعة تلقائيًا
+                            <select :value="managerMonitoringSettings.refreshIntervalMinutes" @change="saveManagerMonitoringSettings('refreshIntervalMinutes', Number($event.target.value))" :disabled="managerBusy || !managerMonitoringLoaded" class="w-full rounded-lg border border-slate-200 bg-white p-2.5">
+                                <option value="1">كل دقيقة</option>
+                                <option value="5">كل 5 دقائق</option>
+                                <option value="15">كل 15 دقيقة</option>
+                                <option value="0">يدوي فقط</option>
+                            </select>
+                        </label>
+                        <p x-show="!managerMonitoringLoaded" class="self-center text-xs font-bold text-amber-700">جارٍ تحميل الإعدادات...</p>
+                    </section>
+                    <div class="manager-insights-hero rounded-2xl p-5 shadow-sm">
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                                <h3 class="text-lg font-black">مركز متابعة أداء الفروع</h3>
+                                <p class="mt-1 text-sm opacity-80">ملخص نشاط الفروع ورسائلك لهم والخطوط المثبتة وحدودها، مع تنبيهات مباشرة ومقارنة عادلة لبيانات اليوم.</p>
+                                <p x-show="managerInsightsLastUpdated" class="mt-2 text-[11px] font-bold opacity-75" x-text="'آخر تحديث: ' + new Date(managerInsightsLastUpdated).toLocaleTimeString('ar-EG') + (Number(managerMonitoringSettings.refreshIntervalMinutes) > 0 ? ' • تحديث تلقائي كل ' + managerMonitoringSettings.refreshIntervalMinutes + ' دقيقة' : ' • التحديث التلقائي متوقف')"></p>
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <button @click="runManagerMonitoringNow()" :disabled="managerInsightsBusy || managerManualRunBusy" class="rounded-xl bg-emerald-400 px-4 py-2 text-xs font-extrabold text-emerald-950 shadow-sm hover:bg-emerald-300 disabled:opacity-50" x-text="managerManualRunBusy ? 'بنراجع الفروع وبنحفظ التقرير...' : 'تحديث البيانات وحفظ التقرير في البريد الداخلي'"></button>
+                            </div>
+                        </div>
+                    </div>
+                    <p x-show="managerInsightsError" x-text="managerInsightsError" role="alert" class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-bold text-rose-700"></p>
+                    <div class="grid gap-3 md:grid-cols-2">
+                        <template x-for="alert in getManagerInsightAlerts()" :key="alert.branchName + alert.text">
+                            <article class="manager-insight-alert" :class="'severity-' + alert.severity">
+                                <span class="manager-insight-dot"></span>
+                                <div><strong x-text="alert.branchName"></strong><p x-text="alert.text"></p></div>
+                            </article>
+                        </template>
+                    </div>
+                    <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                        <div class="border-b border-slate-100 p-4">
+                            <h3 class="font-extrabold text-slate-900">متابعة رسائل الإدارة وردود الفروع</h3>
+                            <p class="mt-1 text-xs text-slate-500">الرسائل النشطة والأسئلة التي تنتظر ردًا أو تم الرد عليها.</p>
+                        </div>
+                        <div class="grid gap-3 p-4 md:grid-cols-2">
+                            <template x-for="branch in managedBranches" :key="'insight-communication-' + branch.id">
+                                <article class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                    <h4 class="text-sm font-extrabold text-slate-900" x-text="branch.name"></h4>
+                                    <p class="mt-2 text-xs font-bold text-slate-600" x-text="branch.communication?.globalAnnouncement?.message || branch.announcement?.message || 'لا توجد رسالة إدارية نشطة.'"></p>
+                                    <div class="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+                                        <span class="font-bold text-blue-700" x-text="branch.communication?.globalPoll?.question || 'لا يوجد سؤال نشط.'"></span>
+                                        <span x-show="branch.communication?.globalPoll?.id && branch.communication?.pollResponse?.pollId === branch.communication?.globalPoll?.id" class="rounded-full bg-emerald-100 px-2 py-1 font-extrabold text-emerald-800" x-text="'تم الرد: ' + (branch.communication?.pollResponse?.answer === 'yes' ? 'نعم' : 'لا')"></span>
+                                        <span x-show="branch.communication?.globalPoll?.id && branch.communication?.pollResponse?.pollId !== branch.communication?.globalPoll?.id" class="rounded-full bg-amber-100 px-2 py-1 font-extrabold text-amber-800">بانتظار الرد</span>
+                                    </div>
+                                </article>
+                            </template>
+                        </div>
+                    </section>
+                    <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                        <div class="border-b border-slate-100 p-4">
+                            <h3 class="font-extrabold text-slate-900">تنبيهات المتابعة الذكية للموظفين</h3>
+                            <p class="mt-1 text-xs text-slate-500">يعرض التنبيه الحالي وسجل آخر التنبيهات بأوقاتها. النظام لا يخصم أو يهدد الموظف تلقائيًا؛ التنبيه الأعلى يفضل بموافقتك.</p>
+                        </div>
+                        <div class="grid gap-3 p-4 md:grid-cols-2">
+                            <template x-for="branch in managedBranches.filter(item => item.communication?.assistantNotice?.id || item.monitoringAlertHistory?.length)" :key="'assistant-notice-' + branch.id">
+                                <article class="rounded-xl border p-3" :class="branch.communication?.assistantNotice?.id && branch.communication?.assistantNoticeRead?.noticeId === branch.communication?.assistantNotice?.id ? 'border-emerald-200 bg-emerald-50/60' : 'border-amber-200 bg-amber-50/60'">
+                                    <div x-show="branch.communication?.assistantNotice?.id" class="flex items-start justify-between gap-3">
+                                        <div class="min-w-0">
+                                            <h4 class="text-sm font-extrabold text-slate-900" x-text="branch.name"></h4>
+                                            <p class="mt-1 text-[10px] font-bold text-slate-500 num-en" x-text="branch.communication?.assistantNotice?.createdAt ? new Date(branch.communication.assistantNotice.createdAt).toLocaleString('ar-EG') : ''"></p>
+                                            <p class="mt-1 whitespace-pre-wrap text-xs font-bold text-slate-700" x-text="branch.communication?.assistantNotice?.message"></p>
+                                            <span class="mt-2 inline-flex rounded-full px-2 py-1 text-[10px] font-extrabold" :class="branch.communication?.assistantNoticeRead?.noticeId === branch.communication?.assistantNotice?.id ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'" x-text="branch.communication?.assistantNoticeRead?.noticeId === branch.communication?.assistantNotice?.id ? 'أكد الفرع الاستلام' : 'بانتظار تأكيد الفرع'"></span>
+                                        </div>
+                                        <button @click="clearManagedAssistantNotice(branch)" :disabled="managerBusy" class="shrink-0 rounded-lg bg-white px-2.5 py-1.5 text-[11px] font-extrabold text-slate-600 ring-1 ring-slate-200 disabled:opacity-50">إغلاق</button>
+                                    </div>
+                                    <div x-show="branch.monitoringAlertHistory?.length" class="mt-3 border-t border-slate-200 pt-2">
+                                        <h5 class="mb-1 text-[10px] font-black text-slate-600">آخر التنبيهات ووقتها</h5>
+                                        <template x-for="alert in (branch.monitoringAlertHistory || []).slice(0, 5)" :key="alert.id">
+                                            <div class="border-t border-slate-100 py-2">
+                                                <p class="text-[10px] font-bold text-slate-500 num-en" x-text="alert.createdAt ? new Date(alert.createdAt).toLocaleString('ar-EG') : 'وقت غير متاح'"></p>
+                                                <p class="mt-0.5 whitespace-pre-wrap text-xs font-semibold text-slate-700" x-text="alert.message"></p>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </article>
+                            </template>
+                            <p x-show="!managedBranches.some(item => item.communication?.assistantNotice?.id || item.monitoringAlertHistory?.length)" class="monitoring-empty-state p-3 text-center text-xs font-bold text-slate-400">لا توجد تنبيهات آلية مسجلة.</p>
+                        </div>
+                    </section>
+                    <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                        <div class="border-b border-slate-100 p-4">
+                            <h3 class="font-extrabold text-slate-900">الخطوط المثبتة للسحب والإيداع</h3>
+                            <p class="mt-1 text-xs text-slate-500">الرصيد والاستخدام والمتبقي من الحد اليومي (60,000 ج) والشهري (200,000 ج) لكل فرع.</p>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="manager-line-table w-full text-right text-xs">
+                                <thead class="bg-slate-50 text-slate-500"><tr><th class="p-3">الفرع</th><th class="p-3">النوع والخط</th><th class="p-3">الرصيد</th><th class="p-3">استخدام اليوم</th><th class="p-3">المتاح اليوم</th><th class="p-3">استخدام الشهر</th><th class="p-3">المتاح شهريًا</th><th class="p-3">إجراء المدير</th></tr></thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    <template x-for="line in managerLineMetrics" :key="'manager-line-' + line.branchId + '-' + line.type">
+                                        <tr>
+                                            <td class="p-3 font-extrabold text-slate-800" x-text="line.branchName"></td>
+                                            <td class="p-3 font-bold" x-text="line.label + ' — ' + line.walletName"></td>
+                                            <td class="p-3 num-en" x-text="formatMoney(line.balance) + ' ج'"></td>
+                                            <td class="p-3 num-en" x-text="formatMoney(line.dailyUsed) + ' ج'"></td>
+                                            <td class="p-3 font-bold text-emerald-700 num-en" x-text="formatMoney(line.dailyRemaining) + ' ج'"></td>
+                                            <td class="p-3 num-en" x-text="formatMoney(line.monthlyUsed) + ' ج'"></td>
+                                            <td class="p-3 font-bold text-blue-700 num-en" x-text="formatMoney(line.monthlyRemaining) + ' ج'"></td>
+                                            <td class="p-3"><button x-show="line.dailyRemaining <= 6000 || line.monthlyRemaining <= 20000" @click="sendManagerApprovedLineNotice(line)" :disabled="managerBusy" class="whitespace-nowrap rounded-lg bg-rose-50 px-2.5 py-1.5 font-bold text-rose-700 disabled:opacity-50">إرسال تنبيه بموافقتي</button></td>
+                                        </tr>
+                                    </template>
+                                    <tr x-show="managerLineMetrics.length === 0"><td colspan="8" class="p-5 text-center text-slate-500">لا توجد خطوط مثبتة للسحب أو الإيداع لدى الفروع.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                    <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <div class="mb-3">
+                            <h3 class="font-extrabold text-slate-900">اسأل عن أداء الفروع</h3>
+                            <p class="mt-1 text-xs text-slate-500">مساعد تقارير محلي يجيب من اللقطات الحالية فقط؛ لا يتخذ قرارات أو يخصم مبالغ تلقائيًا.</p>
+                        </div>
+                        <div class="mb-3 max-h-64 space-y-2 overflow-y-auto" aria-live="polite">
+                            <template x-for="(entry, index) in managerInsightChat" :key="'insight-chat-' + index">
+                                <p class="manager-chat-message max-w-3xl rounded-xl p-3 text-xs font-semibold leading-6" :class="entry.role === 'user' ? 'manager-chat-user' : 'manager-chat-assistant'" x-text="entry.text"></p>
+                            </template>
+                        </div>
+                        <form @submit.prevent="askManagerInsight()" class="manager-chat-form flex flex-col gap-2">
+                            <input x-model="managerInsightQuestion" maxlength="200" class="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm" placeholder="مثال: مين أقل نشاط؟ وهل فيه خط قرب يخلص حده؟">
+                            <button type="submit" :disabled="!managerInsightQuestion.trim()" class="rounded-xl bg-indigo-700 px-5 py-3 text-xs font-extrabold text-white disabled:opacity-50">اسأل المتابعة</button>
+                        </form>
+                    </section>
+                    <div class="grid gap-3 md:grid-cols-2">
+                        <article class="manager-leader-card leader-volume">
+                            <span class="manager-leader-icon"><i data-lucide="trophy"></i></span>
+                            <div><p>الأكثر تنفيذًا للعمليات</p><strong x-text="getManagerTopBranch('transactions')?.name || '—'"></strong><span x-text="getManagerTopBranch('transactions') ? getManagerTopBranch('transactions').transactions + ' عملية اليوم' : 'لا توجد بيانات بعد'"></span></div>
+                        </article>
+                        <article class="manager-leader-card leader-profit">
+                            <span class="manager-leader-icon"><i data-lucide="trending-up"></i></span>
+                            <div><p>الأعلى في العمولات اليوم</p><strong x-text="getManagerTopBranch('fees')?.name || '—'"></strong><span x-text="getManagerTopBranch('fees') ? formatMoney(getManagerTopBranch('fees').totalFees) + ' ج عمولة' : 'لا توجد بيانات بعد'"></span></div>
+                        </article>
+                    </div>
+                    <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                        <div class="border-b border-slate-100 p-4">
+                            <h3 class="font-extrabold text-slate-900">ترتيب الفروع اليوم</h3>
+                            <p class="mt-1 text-xs text-slate-500">المركز حسب إجمالي الأرباح والعمولات، وعدد العمليات يفصل بين الفروع عند التعادل.</p>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full min-w-[650px] text-right text-xs">
+                                <thead class="bg-slate-50 text-slate-500"><tr><th class="p-3">الترتيب</th><th class="p-3">الفرع</th><th class="p-3">العمليات</th><th class="p-3">الإيداعات</th><th class="p-3">السحوبات</th><th class="p-3">العمولات</th><th class="p-3">آخر نشاط</th></tr></thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    <template x-for="(branch, index) in managerBranchMetrics" :key="'metric-' + branch.id">
+                                        <tr :class="index === 0 && branch.transactions > 0 ? 'manager-leader-row' : ''">
+                                            <td class="p-3 font-black" x-text="getManagerRankLabel(branch)"></td>
+                                            <td class="p-3 font-extrabold text-slate-800" x-text="branch.name"></td>
+                                            <td class="p-3 font-black num-en" x-text="branch.transactions"></td>
+                                            <td class="p-3 num-en" x-text="formatMoney(branch.depositVolume) + ' ج'"></td>
+                                            <td class="p-3 num-en" x-text="formatMoney(branch.withdrawVolume) + ' ج'"></td>
+                                            <td class="p-3 font-extrabold text-amber-700 num-en" x-text="formatMoney(branch.totalFees) + ' ج'"></td>
+                                            <td class="p-3 text-slate-500" x-text="branch.idleMinutes === null ? 'لا يوجد نشاط اليوم' : 'منذ ' + branch.idleMinutes + ' دقيقة'"></td>
+                                        </tr>
+                                    </template>
+                                    <tr x-show="managerBranchMetrics.length === 0"><td colspan="7" class="p-6 text-center font-bold text-slate-400" x-text="managerInsightsBusy ? 'جارٍ تحميل بيانات الفروع...' : 'لا توجد بيانات لعرضها.'"></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                    <div x-show="getManagerChallengeText()" class="manager-challenge-banner">
+                        <i data-lucide="trending-up"></i>
+                        <span x-text="getManagerChallengeText()"></span>
+                    </div>
+                </section>
+
+                <section x-show="managerAdminPage === 'emails'" class="manager-email-page space-y-4" aria-label="سجل البريد المرسل">
+                    <div class="manager-email-hero">
+                        <div class="manager-email-hero-icon"><i data-lucide="mail"></i></div>
+                        <div class="min-w-0 flex-1">
+                            <h2>البريد وتقارير المتابعة</h2>
+                            <p>كل التقارير والتنبيهات تُحفظ هنا داخل النظام فقط، ولا تُرسل إلى أي بريد خارجي.</p>
+                            <p class="manager-email-recipient">البريد الداخلي للنظام</p>
+                        </div>
+                        <button @click="sendManagerEmailTest()" :disabled="managerEmailTestBusy" class="manager-email-test-button">
+                            <i data-lucide="save"></i>
+                            <span x-text="managerEmailTestBusy ? 'جارٍ حفظ الاختبار...' : 'تسجيل رسالة اختبار'"></span>
+                        </button>
+                    </div>
+                    <p x-show="managerEmailTestStatus" x-text="managerEmailTestStatus" role="status" class="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-bold text-emerald-800"></p>
+                    <p x-show="managerEmailsError" x-text="managerEmailsError" role="alert" class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-bold text-rose-700"></p>
+                    <section class="manager-email-list">
+                        <div class="manager-email-list-heading">
+                            <div>
+                                <h3>سجل الرسائل</h3>
+                                <p>آخر 100 رسالة محفوظة داخل النظام، مرتبة من الأحدث للأقدم.</p>
+                            </div>
+                            <span class="manager-email-count" x-text="managerEmailLogs.length + ' رسالة'"></span>
+                        </div>
+                        <p x-show="managerEmailsLoading" class="manager-email-empty">جارٍ تحميل البريد...</p>
+                        <p x-show="!managerEmailsLoading && !managerEmailsError && managerEmailLogs.length === 0" class="manager-email-empty">لسه مفيش رسائل محفوظة. استخدم «تسجيل رسالة اختبار» لإضافة رسالة تجريبية هنا.</p>
+                        <div class="manager-email-items">
+                            <template x-for="email in managerEmailLogs" :key="email.id">
+                                <button type="button" class="manager-email-item" @click="openManagerEmail(email)" :aria-label="'فتح البريد: ' + (email.subject || 'رسالة بدون عنوان')">
+                                    <span class="manager-email-row-main">
+                                        <span class="manager-email-subject" x-text="email.subject || 'رسالة بدون عنوان'"></span>
+                                        <span class="manager-email-status" :class="'status-' + (email.status || 'unknown')" x-text="email.status === 'saved' ? 'محفوظ داخل الموقع — لم يُرسل' : email.status === 'sent' ? 'تم الإرسال' : email.status === 'failed' ? 'فشل الإرسال' : 'قيد الإرسال'"></span>
+                                    </span>
+                                    <span class="manager-email-date" x-text="new Date(email.savedAt || email.sentAt || email.failedAt || email.lastAttemptAt || email.createdAt || Date.now()).toLocaleString(getDateTimeLocale())"></span>
+                                    <i data-lucide="chevron-left"></i>
+                                </button>
+                            </template>
+                        </div>
+                    </section>
+                </section>
+
+                <div x-show="selectedManagerEmail" x-cloak @click.self="closeManagerEmail()" @keydown.escape.window="closeManagerEmail()" class="manager-email-modal-backdrop" role="presentation">
+                    <section class="manager-email-modal" role="dialog" aria-modal="true" aria-labelledby="manager-email-modal-title">
+                        <header class="manager-email-modal-header">
+                            <div class="min-w-0">
+                                <p class="manager-email-modal-eyebrow">تفاصيل البريد</p>
+                                <h2 id="manager-email-modal-title" x-text="selectedManagerEmail?.subject || 'رسالة بدون عنوان'"></h2>
+                            </div>
+                            <button type="button" @click="closeManagerEmail()" class="manager-email-modal-close" aria-label="إغلاق تفاصيل البريد"><i data-lucide="x"></i></button>
+                        </header>
+                        <div class="manager-email-modal-meta">
+                            <div>
+                                <span>الحالة</span>
+                                <strong class="manager-email-status" :class="'status-' + (selectedManagerEmail?.status || 'unknown')" x-text="selectedManagerEmail?.status === 'saved' ? 'محفوظ داخل الموقع — لم يُرسل' : selectedManagerEmail?.status === 'sent' ? 'تم الإرسال' : selectedManagerEmail?.status === 'failed' ? 'فشل الإرسال' : 'قيد الإرسال'"></strong>
+                            </div>
+                            <div><span>المكان</span><strong x-text="selectedManagerEmail?.deliveryMode === 'internal' ? 'البريد الداخلي للنظام' : selectedManagerEmail?.recipient || 'البريد الداخلي للنظام'"></strong></div>
+                            <div><span>النوع</span><strong x-text="selectedManagerEmail?.category === 'test' ? 'اختبار' : selectedManagerEmail?.category === 'alert' ? 'تنبيه' : selectedManagerEmail?.category === 'idle_alert' ? 'تنبيه توقف العمليات' : selectedManagerEmail?.category === 'activity' ? 'نشاط' : selectedManagerEmail?.category === 'manual_report' ? 'تقرير يدوي' : 'تقرير دوري'"></strong></div>
+                            <div><span>التاريخ</span><strong x-text="selectedManagerEmail ? new Date(selectedManagerEmail.savedAt || selectedManagerEmail.sentAt || selectedManagerEmail.failedAt || selectedManagerEmail.lastAttemptAt || selectedManagerEmail.createdAt || Date.now()).toLocaleString(getDateTimeLocale()) : ''"></strong></div>
+                        </div>
+                        <p x-show="selectedManagerEmail?.errorCode" class="manager-email-modal-error" role="alert">
+                            <strong>سبب الفشل:</strong>
+                            <span x-text="(selectedManagerEmail?.errorCode || '') + (selectedManagerEmail?.errorMessage ? ' — ' + selectedManagerEmail.errorMessage : '')"></span>
+                        </p>
+                        <pre class="manager-email-modal-body" x-text="selectedManagerEmail?.text || 'لا يوجد نص محفوظ لهذه الرسالة.'"></pre>
+                    </section>
+                </div>
+
+                <form x-show="managerAdminPage === 'branches'" @submit.prevent="createBranchFromManager()" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                     <div class="mb-4 flex items-center gap-3">
                         <div class="rounded-xl bg-emerald-50 p-2 text-emerald-700"><i data-lucide="store" class="h-5 w-5"></i></div>
                         <div>
@@ -657,62 +1053,100 @@
                     <button type="submit" :disabled="managerBusy" class="self-end rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-extrabold text-white hover:bg-blue-700 disabled:opacity-50" x-text="managerBusy ? 'جاري إضافة الفرع...' : 'إضافة الفرع والحساب'"></button>
                     </div>
                 </form>
-                <div class="flex flex-wrap items-center justify-between gap-3">
+                <div x-show="managerAdminPage === 'branches'" class="flex flex-wrap items-center justify-between gap-3">
                     <div>
                         <h3 class="font-extrabold text-slate-900">الفروع المسجلة</h3>
                         <p class="mt-1 text-xs text-slate-500">إعدادات كل فرع مستقلة؛ اختيار الأرباح يُحفظ مباشرة على الفرع المحدد.</p>
                     </div>
                     <input type="search" x-model="managedBranchSearch" placeholder="ابحث باسم الفرع أو كلمة البريد..." class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm sm:w-80">
                 </div>
-                <div class="grid gap-4 xl:grid-cols-2">
+                <div x-show="managerAdminPage === 'branches'" class="manager-branches-grid grid gap-4 xl:grid-cols-2">
                     <template x-for="branch in getFilteredManagedBranches()" :key="branch.id">
-                        <article class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 bg-slate-50/70 p-4">
-                                <div class="flex min-w-0 items-start gap-3">
-                                    <input type="checkbox" x-model="branch.backupSelected" :aria-label="'تحديد فرع ' + branch.name + ' للنسخ الاحتياطي'" class="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600">
-                                    <div class="min-w-0">
-                                        <h4 class="truncate font-extrabold text-slate-900" x-text="branch.name"></h4>
-                                        <p class="mt-1 text-xs text-slate-500" dir="ltr" x-text="branch.emailKeyword"></p>
-                                        <p class="mt-1 break-all text-[11px] font-bold text-blue-700" dir="ltr" x-text="branch.account?.email || branch.devices?.find(device => device.email)?.email || 'معرّف الحساب: ' + (branch.account?.uid || 'غير متاح')"></p>
+                        <article class="managed-branch-card overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                            <div class="managed-branch-card-heading">
+                                <div class="managed-branch-identity">
+                                    <label class="managed-branch-select" :aria-label="'تحديد فرع ' + branch.name + ' للنسخ الاحتياطي'">
+                                        <input type="checkbox" x-model="branch.backupSelected" :aria-label="'تحديد فرع ' + branch.name + ' للنسخ الاحتياطي'">
+                                    </label>
+                                    <div class="managed-branch-icon" :class="'rank-' + (branch.communication?.performanceStatus?.kind || 'idle')" aria-hidden="true">
+                                        <i data-lucide="store"></i>
+                                    </div>
+                                    <div class="managed-branch-title">
+                                        <div class="managed-branch-name-row">
+                                            <h4 class="truncate font-extrabold text-slate-900" x-text="branch.name"></h4>
+                                            <span class="managed-branch-status" :class="branch.account?.active && branch.active !== false ? 'is-active' : 'is-paused'" x-text="branch.account?.active && branch.active !== false ? 'نشط' : 'موقوف'"></span>
+                                        </div>
+                                        <p class="managed-branch-keyword" dir="ltr" x-text="branch.emailKeyword"></p>
+                                        <p class="managed-branch-email" dir="ltr" x-text="branch.account?.email || branch.devices?.find(device => device.email)?.email || 'معرّف الحساب: ' + (branch.account?.uid || 'غير متاح')"></p>
+                                        <span x-show="branch.communication?.performanceStatus?.title" class="managed-branch-rank" :class="'rank-' + (branch.communication?.performanceStatus?.kind || 'idle')" x-text="branch.communication?.performanceStatus?.title"></span>
                                     </div>
                                 </div>
-                                <div class="flex items-center gap-2">
-                                    <span :class="branch.account?.active && branch.active !== false ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'" class="rounded-full px-2.5 py-1 text-[10px] font-extrabold" x-text="branch.account?.active && branch.active !== false ? 'نشط' : 'موقوف'"></span>
-                                    <button @click="openManagedBranch(branch)" :disabled="!branch.account?.active || branch.active === false" class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50">فتح الفرع</button>
+                                <div class="managed-branch-actions">
+                                    <span class="managed-branch-device-count">
+                                        <span class="num-en" x-text="branch.activeDevices ?? 0"></span>
+                                        <span>أجهزة</span>
+                                    </span>
+                                    <button @click="openManagedBranch(branch)" :disabled="!branch.account?.active || branch.active === false" class="managed-branch-open">
+                                        <i data-lucide="external-link"></i><span>فتح الفرع</span>
+                                    </button>
                                 </div>
                             </div>
-                            <div class="space-y-4 p-4">
-                                <div class="global-poll-response-box">
-                                    <div class="flex items-center justify-between gap-2">
-                                        <span class="text-[11px] font-extrabold">رد الفرع على آخر سؤال عام</span>
-                                        <span x-show="branch.communication?.pollResponse?.pollId === branch.communication?.globalPoll?.id && branch.communication?.globalPoll?.id" class="global-poll-response-chip" :class="branch.communication?.pollResponse?.answer === 'yes' ? 'is-yes' : 'is-no'" x-text="language === 'en' ? (branch.communication?.pollResponse?.answer === 'yes' ? 'Yes' : 'No') : (branch.communication?.pollResponse?.answer === 'yes' ? 'نعم' : 'لا')"></span>
-                                        <span x-show="!branch.communication?.globalPoll?.id || branch.communication?.pollResponse?.pollId !== branch.communication?.globalPoll?.id" class="global-poll-response-pending" x-text="language === 'en' ? 'Awaiting response' : 'بانتظار الرد'"></span>
-                                    </div>
-                                    <p class="mt-1 text-[11px] leading-5 text-slate-600" x-text="branch.communication?.globalPoll?.question || 'لم يتم إرسال سؤال عام بعد.'"></p>
-                                </div>
+                            <details class="border-t border-slate-100">
+                                <summary class="managed-branch-settings-summary">
+                                    <span class="managed-branch-settings-label"><i data-lucide="settings-2"></i>إعدادات وصلاحيات الفرع</span>
+                                    <i class="managed-branch-settings-chevron" data-lucide="chevron-down"></i>
+                                </summary>
+                                <div class="space-y-4 border-t border-slate-100 p-4">
                                 <div class="grid gap-3 sm:grid-cols-2">
-                                    <label class="space-y-1.5 text-xs font-bold text-slate-600">اسم الفرع
+                                    <label class="managed-branch-field space-y-1.5 text-xs font-bold text-slate-600">
+                                        <span class="managed-branch-field-label"><i data-lucide="store"></i>اسم الفرع</span>
                                         <input x-model.trim="branch.name" :disabled="managerBusy" class="w-full rounded-lg border border-slate-200 p-2.5">
                                     </label>
-                                    <label class="space-y-1.5 text-xs font-bold text-slate-600">كلمة تمييز البريد
+                                    <label class="managed-branch-field space-y-1.5 text-xs font-bold text-slate-600">
+                                        <span class="managed-branch-field-label"><i data-lucide="at-sign"></i>كلمة تمييز البريد</span>
                                         <input x-model.trim="branch.emailKeyword" required pattern="[A-Za-z0-9._-]+" :disabled="managerBusy" class="w-full rounded-lg border border-slate-200 p-2.5 text-left font-mono" dir="ltr">
                                     </label>
-                                </div>
+                                    </div>
+                                    <form x-show="branch.account?.uid" @submit.prevent="updateManagedBranchEmail(branch)" class="branch-email-form flex flex-col gap-2 rounded-xl border border-blue-100 bg-blue-50/60 p-3">
+                                        <label class="managed-branch-field min-w-0 flex-1 space-y-1.5 text-xs font-bold text-slate-700">
+                                            <span class="managed-branch-field-label"><i data-lucide="mail"></i>بريد حساب الفرع الموجود في Firebase</span>
+                                            <input x-model.trim="branch.account.emailDraft" type="email" required autocomplete="off" :disabled="managerBusy" class="w-full rounded-lg border border-blue-200 bg-white p-2.5 text-left font-mono" dir="ltr">
+                                        </label>
+                                        <p class="text-[11px] leading-5 text-slate-600">يربط الفرع بالحساب الموجود بهذا البريد من غير حذف الفرع أو بياناته.</p>
+                                        <button type="submit" :disabled="managerBusy || !branch.account?.emailDraft" class="shrink-0 self-start rounded-lg bg-blue-700 px-4 py-2.5 text-xs font-extrabold text-white disabled:opacity-50" x-text="managerBusy ? 'جارٍ ربط الحساب...' : 'ربط حساب الفرع'"></button>
+                                    </form>
                                 <div class="grid gap-3 sm:grid-cols-2">
-                                    <label class="space-y-1.5 text-xs font-bold text-slate-700">خصوصية أرباح الشيفت
+                                    <label class="managed-branch-field space-y-1.5 text-xs font-bold text-slate-700">
+                                        <span class="managed-branch-field-label"><i data-lucide="eye"></i>خصوصية أرباح الشيفت</span>
                                         <select :value="branch.dailyFeesVisibility" @change="setBranchDailyFeesVisibility(branch, $event.target.value)" :disabled="managerBusy" class="w-full rounded-lg border border-slate-200 bg-white p-2.5">
                                             <option value="show">إظهار الأرباح</option>
                                             <option value="blur">تمويه الأرباح</option>
                                             <option value="hide">إخفاء الأرباح</option>
                                         </select>
                                     </label>
-                                    <div class="flex items-end justify-between rounded-xl bg-slate-50 px-3 py-2.5">
-                                        <span class="text-xs font-bold text-slate-600">الأجهزة النشطة</span>
-                                        <span class="font-extrabold text-blue-700 num-en" x-text="branch.activeDevices ?? 0"></span>
+                                    <div class="managed-branch-device-stat">
+                                        <span class="managed-branch-field-label"><i data-lucide="monitor-smartphone"></i>الأجهزة النشطة</span>
+                                        <span class="managed-branch-device-value num-en" x-text="branch.activeDevices ?? 0"></span>
                                     </div>
                                 </div>
+                                <div class="grid gap-3 sm:grid-cols-2">
+                                    <label class="managed-branch-field space-y-1.5 text-xs font-bold text-slate-700">
+                                        <span class="managed-branch-field-label"><i data-lucide="badge-percent"></i>تعديل عمولة السحب والإيداع</span>
+                                        <select :value="branch.allowCommissionEdit === false ? 'locked' : 'allowed'" @change="setBranchOperatingSettings(branch, { allowCommissionEdit: $event.target.value === 'allowed' })" :disabled="managerBusy" class="w-full rounded-lg border border-slate-200 bg-white p-2.5">
+                                            <option value="allowed">مسموح لموظفي الفرع</option>
+                                            <option value="locked">مقفول — عمولة تلقائية فقط</option>
+                                        </select>
+                                    </label>
+                                    <label class="managed-branch-field space-y-1.5 text-xs font-bold text-slate-700">
+                                        <span class="managed-branch-field-label"><i data-lucide="rotate-ccw"></i>تصفير عداد العمليات</span>
+                                        <select :value="branch.transactionPeriodReset || 'daily'" @change="setBranchOperatingSettings(branch, { transactionPeriodReset: $event.target.value })" :disabled="managerBusy" class="w-full rounded-lg border border-slate-200 bg-white p-2.5">
+                                            <option value="daily">مع بداية كل يوم</option>
+                                            <option value="closing">بعد كل تقفيلة معتمدة</option>
+                                        </select>
+                                    </label>
+                                </div>
                                 <details class="rounded-xl border border-slate-200">
-                                    <summary class="cursor-pointer px-3 py-2.5 text-xs font-extrabold text-slate-700" x-text="'عرض وإدارة أجهزة الفرع (' + (branch.devices?.filter(device => device.online).length || 0) + ' متصل)'"></summary>
+                                    <summary class="managed-branch-nested-summary"><i data-lucide="monitor-cog"></i><span x-text="'عرض وإدارة أجهزة الفرع (' + (branch.devices?.filter(device => device.online).length || 0) + ' متصل)'"></span><i class="managed-branch-nested-chevron" data-lucide="chevron-down"></i></summary>
                                     <div class="space-y-2 border-t border-slate-100 p-3">
                                         <template x-for="device in branch.devices || []" :key="device.deviceId">
                                             <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 p-3">
@@ -732,12 +1166,18 @@
                                         <p x-show="!branch.devices?.length" class="p-3 text-center text-xs font-bold text-slate-500">لا توجد أجهزة مسجلة لهذا الفرع بعد.</p>
                                     </div>
                                 </details>
-                                <label class="flex items-center gap-2 text-xs font-bold text-slate-700">
+                                <label class="managed-branch-permission">
+                                    <i data-lucide="shield-check"></i>
                                     <input type="checkbox" :checked="branch.account?.canAccessAdmin === true" :disabled="!branch.account || managerBusy" @change="updateBranchPermission(branch, 'canAccessAdmin', $event.target.checked)" class="h-4 w-4 rounded border-slate-300 text-blue-600">
-                                    السماح لحساب الفرع بدخول لوحة الإدارة
+                                    <span>السماح لحساب الفرع بدخول لوحة الإدارة</span>
+                                </label>
+                                <label class="managed-branch-permission">
+                                    <i data-lucide="users-round"></i>
+                                    <input type="checkbox" :checked="branch.account?.canEditCustomers === true" :disabled="!branch.account || managerBusy" @change="updateBranchPermission(branch, 'canEditCustomers', $event.target.checked)" class="h-4 w-4 rounded border-slate-300 text-blue-600">
+                                    <span>السماح بتعديل وحذف بيانات العملاء</span>
                                 </label>
                                 <form x-show="branch.account?.uid" @submit.prevent="changeManagedBranchPassword(branch)" class="space-y-2 rounded-xl border border-amber-200 bg-amber-50/60 p-3">
-                                    <h5 class="flex items-center gap-2 text-xs font-extrabold text-amber-900"><i data-lucide="key-round" class="h-4 w-4"></i> تعيين كلمة مرور جديدة لهذا الفرع</h5>
+                                    <h5 class="managed-branch-password-title"><i data-lucide="key-round"></i> تعيين كلمة مرور جديدة لهذا الفرع</h5>
                                     <p class="text-[11px] font-semibold leading-5 text-amber-900">التغيير يتم من صلاحية المدير مباشرة؛ لن تظهر كلمة المرور القديمة ولن تُحفظ هنا.</p>
                                     <div class="grid gap-2 sm:grid-cols-2">
                                         <label class="space-y-1 text-[11px] font-bold text-slate-700">كلمة المرور الجديدة
@@ -750,26 +1190,24 @@
                                     <button type="submit" :disabled="managerBusy" class="rounded-lg bg-amber-700 px-3 py-2 text-xs font-extrabold text-white disabled:opacity-50" x-text="managerBusy ? 'جارٍ تغيير كلمة المرور...' : 'تغيير كلمة المرور'"></button>
                                 </form>
                                 <details class="rounded-xl border border-slate-200">
-                                    <summary class="cursor-pointer px-3 py-2.5 text-xs font-extrabold text-slate-700">إعدادات وإجراءات إضافية</summary>
+                                    <summary class="managed-branch-nested-summary"><i data-lucide="sliders-horizontal"></i><span>إعدادات وإجراءات إضافية</span><i class="managed-branch-nested-chevron" data-lucide="chevron-down"></i></summary>
                                     <div class="space-y-3 border-t border-slate-100 p-3">
-                                        <label class="block space-y-1.5 text-xs font-bold text-slate-600">رسالة تظهر للموظف
-                                            <textarea x-model="branch.announcementDraft" rows="2" maxlength="500" placeholder="اكتب رسالة لهذا الفرع (500 حرف كحد أقصى)" class="w-full rounded-lg border border-slate-200 p-2.5"></textarea>
-                                        </label>
+                                        <p class="rounded-lg bg-indigo-50 p-3 text-xs font-semibold leading-5 text-indigo-800">لإرسال رسالة أو سؤال لهذا الفرع أو لكل الفروع، استخدم صفحة «الرسائل والأسئلة».</p>
                                         <div class="flex flex-wrap gap-2">
                                             <button @click="saveBranchDetails(branch)" :disabled="managerBusy" class="rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 disabled:opacity-50">حفظ بيانات الفرع</button>
-                                            <button @click="saveBranchAnnouncement(branch)" :disabled="managerBusy" class="rounded-lg bg-violet-50 px-3 py-2 text-xs font-bold text-violet-700 disabled:opacity-50">حفظ الرسالة</button>
                                             <button @click="updateBranchPermission(branch, 'active', !branch.account?.active)" :disabled="!branch.account || managerBusy" class="rounded-lg bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 disabled:opacity-50" x-text="branch.account?.active ? 'إيقاف الحساب' : 'تفعيل الحساب'"></button>
                                             <button @click="loadBranchActivity(branch)" :disabled="managerBusy" class="rounded-lg bg-slate-800 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">سجل النشاط</button>
                                             <button @click="deleteManagedBranch(branch)" :disabled="managerBusy" class="rounded-lg bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 disabled:opacity-50">حذف الفرع</button>
                                         </div>
                                     </div>
                                 </details>
-                            </div>
+                                </div>
+                            </details>
                         </article>
                     </template>
                 </div>
-                <div x-show="getFilteredManagedBranches().length === 0" class="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm font-bold text-slate-500" x-text="managedBranches.length ? 'لا توجد فروع تطابق البحث.' : 'لا توجد فروع بعد. أضف أول فرع من النموذج أعلاه.'"></div>
-                <section x-show="managerActivityBranchName" class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div x-show="managerAdminPage === 'branches' && getFilteredManagedBranches().length === 0" class="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm font-bold text-slate-500" x-text="managedBranches.length ? 'لا توجد فروع تطابق البحث.' : 'لا توجد فروع بعد. أضف أول فرع من النموذج أعلاه.'"></div>
+                <section x-show="managerAdminPage === 'branches' && managerActivityBranchName" class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <div class="flex items-center justify-between bg-slate-100 p-3">
                         <h3 class="font-extrabold text-slate-800" x-text="'آخر أنشطة ' + managerActivityBranchName"></h3>
                         <button @click="managerActivityBranchName = ''; managerActivityLogs = []" class="rounded-lg bg-white px-3 py-1.5 text-xs font-bold text-slate-600">إغلاق</button>
@@ -1217,7 +1655,7 @@
             <template x-if="adminTab === 'vouchers'">
             <div class="space-y-4">
                 
-                <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="voucher-workspace bg-white rounded-2xl border border-slate-200 p-4 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div data-workflow-group="voucher" class="md:col-span-2 space-y-3">
                         <h3 class="font-extrabold text-slate-800 text-base flex items-center gap-2 border-b border-slate-100 pb-2">
                             <i data-lucide="file-plus" class="w-5 h-5 text-indigo-600"></i> إضافة سند قبض أو صرف جديد
@@ -1285,6 +1723,11 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="voucher-customer-action-wrap">
+                            <button type="button" @click="openVoucherCustomerModal()" class="voucher-customer-action">
+                                <i data-lucide="user-plus" class="h-4 w-4"></i> إضافة عميل جديد
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -1302,6 +1745,7 @@
                                     <th class="p-2.5">النوع</th>
                                     <th class="p-2.5">العميل</th>
                                     <th class="p-2.5">المبلغ</th>
+                                    <th class="p-2.5">رصيد العميل الحالي</th>
                                     <th class="p-2.5">السبب / الملاحظة</th>
                                     <th class="p-2.5 text-center">إجراءات</th>
                                 </tr>
@@ -1313,8 +1757,12 @@
                                         <td class="p-2.5">
                                             <span :class="v.type === 'receipt' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'" class="px-2 py-0.5 rounded-full text-[10px]" x-text="v.type === 'receipt' ? 'قبض (داخل)' : 'صرف (خارج)'"></span>
                                         </td>
-                                        <td class="p-2.5 text-slate-900" x-text="getCustomerName(v.customerId)"></td>
+                                        <td class="p-2.5 text-slate-900">
+                                            <span x-text="getCustomerName(v.customerId)"></span>
+                                            <span class="mt-0.5 block text-[10px] text-slate-400 num-en" x-text="customers.find(customer => customer.id === v.customerId)?.phone || 'بدون رقم هاتف'"></span>
+                                        </td>
                                         <td class="p-2.5 font-black num-en" :class="v.type === 'receipt' ? 'text-emerald-600' : 'text-rose-600'" x-text="formatMoney(v.amount) + ' ج'"></td>
+                                        <td class="p-2.5 font-extrabold num-en" :class="(customers.find(customer => customer.id === v.customerId)?.balance || 0) > 0 ? 'text-rose-700' : 'text-emerald-700'" x-text="formatMoney(Math.abs(customers.find(customer => customer.id === v.customerId)?.balance || 0)) + ' ج ' + ((customers.find(customer => customer.id === v.customerId)?.balance || 0) > 0 ? 'عليه' : 'له')"></td>
                                         <td class="p-2.5 text-slate-600" x-text="v.notes"></td>
                                         <td class="p-2.5 text-center">
                                             <div class="flex justify-center gap-2">
@@ -1372,8 +1820,8 @@
                                             <td class="p-2 text-center">
                                                 <div class="flex justify-center gap-1">
                                                     <button @click="viewCustomerStatement(c)" class="bg-rose-100 text-rose-800 hover:bg-rose-200 px-2 py-1 rounded text-[10px]">كشف حساب</button>
-                                                    <button @click="editCustomer(c)" class="text-blue-600" title="تعديل العميل"><i data-lucide="edit" class="w-4 h-4"></i></button>
-                                                    <button @click="deleteCustomer(c.id)" class="text-rose-600" title="حذف العميل"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                                    <button x-show="canEditCustomerRecords" @click="editCustomer(c)" class="text-blue-600" title="تعديل العميل"><i data-lucide="edit" class="w-4 h-4"></i></button>
+                                                    <button x-show="canEditCustomerRecords" @click="deleteCustomer(c.id)" class="text-rose-600" title="حذف العميل"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -1407,8 +1855,8 @@
                                             <td class="p-2 text-center">
                                                 <div class="flex justify-center gap-1">
                                                     <button @click="viewCustomerStatement(c)" class="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 px-2 py-1 rounded text-[10px]">كشف حساب</button>
-                                                    <button @click="editCustomer(c)" class="text-blue-600" title="تعديل العميل"><i data-lucide="edit" class="w-4 h-4"></i></button>
-                                                    <button @click="deleteCustomer(c.id)" class="text-rose-600" title="حذف العميل"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                                    <button x-show="canEditCustomerRecords" @click="editCustomer(c)" class="text-blue-600" title="تعديل العميل"><i data-lucide="edit" class="w-4 h-4"></i></button>
+                                                    <button x-show="canEditCustomerRecords" @click="deleteCustomer(c.id)" class="text-rose-600" title="حذف العميل"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -1499,10 +1947,20 @@
                     </h3>
                     <div class="grid grid-cols-1 md:grid-cols-5 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
                         <label class="text-xs font-bold text-slate-600">الخط / المحفظة
-                            <select x-model="walletReportFilter.walletId" class="mt-1 w-full bg-white border border-slate-300 rounded-xl p-2 text-xs">
-                                <option value="">كل الخطوط</option>
-                                <template x-for="w in wallets" :key="'report-' + w.id"><option :value="w.id" x-text="w.name + ' (' + w.phone + ')' "></option></template>
-                            </select>
+                            <div class="relative mt-1" @click.outside="walletReportDropdownOpen = false">
+                                <input type="search" x-model="walletReportSearch" @focus="walletReportDropdownOpen = true" @input="walletReportDropdownOpen = true; walletReportFilter.walletId = ''" placeholder="ابحث باسم الخط أو رقم الهاتف..." autocomplete="off" class="w-full rounded-xl border border-slate-300 bg-white p-2 text-xs">
+                                <div x-show="walletReportDropdownOpen" x-cloak class="absolute z-30 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl">
+                                    <button type="button" @click="selectWalletReportWallet(null)" class="w-full rounded-lg px-3 py-2 text-right text-xs font-bold text-slate-700 hover:bg-slate-50">كل الخطوط</button>
+                                    <template x-for="w in getFilteredWalletReportWallets()" :key="'report-' + w.id">
+                                        <button type="button" @click="selectWalletReportWallet(w)" class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-right text-xs hover:bg-blue-50">
+                                            <span class="font-extrabold text-slate-800" x-text="w.name + ' (' + (w.phone || 'بدون رقم') + ')'"></span>
+                                            <span class="text-slate-500" x-text="getWalletCategoryLabel(getWalletCategory(w))"></span>
+                                        </button>
+                                    </template>
+                                    <p x-show="getFilteredWalletReportWallets().length === 0" class="p-3 text-center text-xs font-bold text-slate-400">لا توجد خطوط مطابقة.</p>
+                                </div>
+                            </div>
+                            <span x-show="walletReportFilter.walletId" class="mt-1 block text-[10px] text-blue-700" x-text="'المحدد: ' + (wallets.find(item => item.id === walletReportFilter.walletId)?.name || '')"></span>
                         </label>
                         <label class="text-xs font-bold text-slate-600">من تاريخ
                             <input type="date" x-model="walletReportFilter.fromDate" class="mt-1 w-full bg-white border border-slate-300 rounded-xl p-2 text-xs">
@@ -1630,7 +2088,7 @@
                     <input type="number" min="0" x-model.number="transactionForm.amount" data-workflow-field class="mt-1 w-full bg-slate-50 border border-slate-300 rounded-lg p-2 num-en">
                 </label>
                 <label class="text-xs font-bold text-slate-600">العمولة
-                    <input type="number" min="0" x-model.number="transactionForm.fee" data-workflow-field class="mt-1 w-full bg-slate-50 border border-slate-300 rounded-lg p-2 num-en">
+                    <input type="number" min="0" x-model.number="transactionForm.fee" :disabled="!canEditTransactionCommission" data-workflow-field class="mt-1 w-full bg-slate-50 border border-slate-300 rounded-lg p-2 num-en disabled:cursor-not-allowed disabled:opacity-60">
                 </label>
                 <label class="text-xs font-bold text-slate-600">التاريخ والوقت
                     <input type="datetime-local" x-model="transactionForm.datetime" data-workflow-field class="mt-1 w-full bg-slate-50 border border-slate-300 rounded-lg p-2 num-en">
@@ -1707,8 +2165,8 @@
 
     <!-- MODAL 3: CUSTOMER ADD MODAL -->
     <div x-show="showCustomerModal" x-cloak class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div @click.away="showCustomerModal = false" class="bg-white rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-2xl border border-slate-100">
-            <h3 class="font-extrabold text-slate-900 text-base" x-text="editingCustomerId ? 'تعديل بيانات العميل' : 'إضافة عميل جديد للآجل'"></h3>
+        <div @click.away="showCustomerModal = false" class="bg-white rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl border border-slate-100">
+            <h3 class="font-extrabold text-slate-900 text-base" x-text="editingCustomerId ? 'تعديل بيانات العميل' : (customerAddFromVoucher ? 'إضافة عميل وربطه بالسند' : 'إضافة عميل جديد للآجل')"></h3>
             <div class="space-y-3">
                 <div>
                     <label class="block text-xs font-bold text-slate-600 mb-1">اسم العميل:</label>
@@ -1717,6 +2175,18 @@
                 <div>
                     <label class="block text-xs font-bold text-slate-600 mb-1">رقم الهاتف:</label>
                     <input type="text" x-model="customerForm.phone" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-xs font-bold num-en">
+                </div>
+                <div x-show="!editingCustomerId" class="grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <label class="text-xs font-bold text-slate-600">الرصيد الافتتاحي (ج)
+                        <input type="number" min="0" step="0.01" x-model.number="customerForm.openingBalance" class="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2 num-en">
+                    </label>
+                    <label class="text-xs font-bold text-slate-600">طبيعة الرصيد
+                        <select x-model="customerForm.balanceDirection" class="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2">
+                            <option value="owesUs">العميل عليه فلوس لنا</option>
+                            <option value="weOwe">لِلعميل فلوس عندنا</option>
+                        </select>
+                    </label>
+                    <p class="col-span-2 text-[10px] font-semibold leading-5 text-slate-500">عند تعديل عميل موجود، رصيده لا يتغير. استخدم سند قبض أو صرف لتسجيل حركة الرصيد.</p>
                 </div>
             </div>
             <div class="flex gap-2 pt-2">
