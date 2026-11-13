@@ -230,7 +230,8 @@
         </section>
     </header>
 
-    <details x-show="firebaseDataReady && currentBranch && currentMode === 'cashier'" x-cloak class="branch-rank-dropdown no-print" :class="['rank-' + (currentBranch?.communication?.performanceStatus?.kind || 'idle'), branchPerformanceCueActive ? 'is-celebrating' : '']">
+    <div x-show="firebaseDataReady && currentBranch && currentMode === 'cashier'" x-cloak class="mx-auto grid w-full max-w-7xl grid-cols-1 gap-2 px-4 md:grid-cols-2">
+    <details x-show="currentBranch?.communication?.performanceStatus || currentBranch" class="branch-rank-dropdown cashier-header-card no-print" :class="['rank-' + (currentBranch?.communication?.performanceStatus?.kind || 'idle'), branchPerformanceCueActive ? 'is-celebrating' : '']">
         <summary>
             <i :data-lucide="currentBranch?.communication?.performanceStatus?.kind === 'leader' ? 'trophy' : currentBranch?.communication?.performanceStatus?.kind === 'slow' ? 'trending-down' : 'activity'"></i>
             <span x-text="currentBranch?.communication?.performanceStatus?.kind === 'leader' ? 'إنتوا رقم 1 النهارده' : currentBranch?.communication?.performanceStatus?.kind === 'second' ? 'إنتوا المركز التاني' : currentBranch?.communication?.performanceStatus?.kind === 'slow' ? 'محتاجين تشدوا حيلكم' : currentBranch?.communication?.performanceStatus ? 'ترتيبكم النهارده' : 'بنحدّث ترتيب الفرع'"></span>
@@ -243,11 +244,28 @@
             <div class="branch-rank-dropdown-stats">
                 <span><strong x-text="currentBranch?.communication?.performanceStatus?.transactions || 0"></strong> عملية النهارده</span>
                 <span><strong x-text="formatMoney(currentBranch?.communication?.performanceStatus?.fees || 0)"></strong> عمولات</span>
-                <span>آخر تحديث <strong x-text="currentBranch?.communication?.performanceStatus?.updatedAt ? new Date(currentBranch.communication.performanceStatus.updatedAt).toLocaleTimeString('ar-EG', { hour: 'numeric', minute: '2-digit' }) : '—'"></strong></span>
+                <span>آخر تحديث <strong x-text="currentBranch?.communication?.performanceStatus?.updatedAt ? new Date(currentBranch.communication.performanceStatus.updatedAt).toLocaleTimeString(getDateTimeLocale(), { hour: 'numeric', minute: '2-digit' }) : '—'"></strong></span>
             </div>
         </div>
         <p x-show="!currentBranch?.communication?.performanceStatus" class="branch-rank-dropdown-pending">أول ما يوصلنا تحديث المتابعة، ترتيبك هيظهر هنا. لو اتأخر، خلي المدير يراجع تحديث النظام.</p>
     </details>
+    <details x-show="getActiveDailyTarget()" class="branch-rank-dropdown cashier-header-card rank-steady no-print" :class="getCashierGoalProgress().achieved ? 'is-celebrating' : ''">
+        <summary>
+            <i :data-lucide="getCashierGoalProgress().achieved ? 'trophy' : 'target'"></i>
+            <span x-text="getCashierGoalProgress().achieved ? 'حققتوا هدف الشيفت' : 'هدف الشيفت النهارده'"></span>
+            <span class="branch-rank-dropdown-count" x-text="formatMoney(getCashierGoalProgress().profit) + ' / ' + formatMoney(getCashierGoalProgress().target) + ' ج'"></span>
+            <i class="branch-rank-dropdown-chevron" data-lucide="chevron-down"></i>
+        </summary>
+        <div class="branch-rank-dropdown-content">
+            <p class="branch-rank-dropdown-message" x-text="getCashierGoalProgress().achieved ? 'عاش يا أبطال، حققتوا هدف الشيفت! كملوا بنفس التركيز.' : 'كل عملية بعمولتها الصح بتقربكم من الهدف. شدوا حيلكم وإن شاء الله تحققوه.'"></p>
+            <div class="mt-2 h-2 overflow-hidden rounded-full bg-white/70"><span class="block h-full rounded-full bg-emerald-500 transition-all" :style="'width:' + getCashierGoalProgress().percent + '%'"></span></div>
+            <div class="branch-rank-dropdown-stats">
+                <span>المكافأة <strong class="num-en" x-text="formatMoney(getCashierGoalProgress().reward) + ' ج'"></strong></span>
+                <span>المتبقي <strong class="num-en" x-text="formatMoney(getCashierGoalProgress().remaining) + ' ج'"></strong></span>
+            </div>
+        </div>
+    </details>
+    </div>
 
     <div x-show="firebaseDataReady && currentBranch" x-cloak class="branch-notification-stack no-print">
     <aside x-show="currentBranch?.announcement?.id && branchAnnouncementDismissedId !== currentBranch.announcement.id" aria-live="polite" class="global-announcement flex items-start justify-between gap-3 rounded-2xl px-4 py-3 text-sm shadow-sm">
@@ -447,13 +465,13 @@
                                 </div>
                                 <div>
                                     <label class="block text-xs font-bold text-slate-600 mb-1" x-text="canEditTransactionCommission ? 'العمولة (تُحسب تلقائيًا ويمكن تعديلها):' : 'العمولة (تلقائية ومقفولة):'"></label>
-                                    <input type="number" min="0" x-model.number="cashierDeposit.fee" :disabled="!canEditTransactionCommission" @keydown="handleCashierWorkflowKeydown($event, 'deposit')" data-cashier-step="fee" class="w-full bg-emerald-50 border border-emerald-300 rounded-xl p-2.5 text-base font-black text-emerald-800 num-en focus:ring-2 focus:ring-emerald-500 disabled:cursor-not-allowed disabled:opacity-60">
+                                    <input type="number" min="0" x-model.number="cashierDeposit.fee" :disabled="!canEditTransactionCommission" @input="cashierDeposit.feeEdited = true" @keydown="handleCashierWorkflowKeydown($event, 'deposit')" data-cashier-step="fee" class="w-full bg-emerald-50 border border-emerald-300 rounded-xl p-2.5 text-base font-black text-emerald-800 num-en focus:ring-2 focus:ring-emerald-500 disabled:cursor-not-allowed disabled:opacity-60">
                                 </div>
                             </div>
 
                             <div class="pt-2 border-t border-slate-100">
-                                <label class="block text-xs font-semibold text-slate-500 mb-1">آخر 3 أرقام من رقم العميل (اختياري):</label>
-                                <input type="text" inputmode="numeric" maxlength="3" x-model="cashierDeposit.lastThree" @keydown="handleCashierWorkflowKeydown($event, 'deposit')" data-cashier-step="lastThree" placeholder="123" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-sm font-bold num-en">
+                                <label class="block text-xs font-semibold text-slate-500 mb-1" x-text="language === 'en' ? 'Last ' + branchExperienceSettings.customerNumberDigits + ' digits of customer number (optional):' : 'آخر ' + branchExperienceSettings.customerNumberDigits + ' أرقام من رقم العميل (اختياري):'"></label>
+                                <input type="text" inputmode="numeric" :maxlength="branchExperienceSettings.customerNumberDigits" x-model="cashierDeposit.lastThree" @input="$event.target.value = normalizeCustomerNumberDigits($event.target.value); cashierDeposit.lastThree = $event.target.value" @keydown="handleCashierWorkflowKeydown($event, 'deposit')" data-cashier-step="lastThree" :placeholder="'1234'.slice(0, branchExperienceSettings.customerNumberDigits)" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-sm font-bold num-en">
                             </div>
                         </div>
                     </div>
@@ -540,13 +558,13 @@
                                 </div>
                                 <div>
                                     <label class="block text-xs font-bold text-slate-600 mb-1" x-text="canEditTransactionCommission ? 'العمولة (تُحسب تلقائيًا ويمكن تعديلها):' : 'العمولة (تلقائية ومقفولة):'"></label>
-                                    <input type="number" min="0" x-model.number="cashierWithdraw.fee" :disabled="!canEditTransactionCommission" @keydown="handleCashierWorkflowKeydown($event, 'withdraw')" data-cashier-step="fee" class="w-full bg-rose-50 border border-rose-300 rounded-xl p-2.5 text-base font-black text-rose-800 num-en focus:ring-2 focus:ring-rose-500 disabled:cursor-not-allowed disabled:opacity-60">
+                                    <input type="number" min="0" x-model.number="cashierWithdraw.fee" :disabled="!canEditTransactionCommission" @input="cashierWithdraw.feeEdited = true" @keydown="handleCashierWorkflowKeydown($event, 'withdraw')" data-cashier-step="fee" class="w-full bg-rose-50 border border-rose-300 rounded-xl p-2.5 text-base font-black text-rose-800 num-en focus:ring-2 focus:ring-rose-500 disabled:cursor-not-allowed disabled:opacity-60">
                                 </div>
                             </div>
 
                             <div class="pt-2 border-t border-slate-100">
-                                <label class="block text-xs font-semibold text-slate-500 mb-1">آخر 3 أرقام من رقم العميل (اختياري):</label>
-                                <input type="text" inputmode="numeric" maxlength="3" x-model="cashierWithdraw.lastThree" @keydown="handleCashierWorkflowKeydown($event, 'withdraw')" data-cashier-step="lastThree" placeholder="123" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-sm font-bold num-en">
+                                <label class="block text-xs font-semibold text-slate-500 mb-1" x-text="language === 'en' ? 'Last ' + branchExperienceSettings.customerNumberDigits + ' digits of customer number (optional):' : 'آخر ' + branchExperienceSettings.customerNumberDigits + ' أرقام من رقم العميل (اختياري):'"></label>
+                                <input type="text" inputmode="numeric" :maxlength="branchExperienceSettings.customerNumberDigits" x-model="cashierWithdraw.lastThree" @input="$event.target.value = normalizeCustomerNumberDigits($event.target.value); cashierWithdraw.lastThree = $event.target.value" @keydown="handleCashierWorkflowKeydown($event, 'withdraw')" data-cashier-step="lastThree" :placeholder="'1234'.slice(0, branchExperienceSettings.customerNumberDigits)" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-sm font-bold num-en">
                             </div>
                         </div>
                     </div>
@@ -586,7 +604,7 @@
                             <div class="max-h-72 overflow-auto">
                                 <table class="w-full text-right text-xs">
                                     <thead class="sticky top-0 bg-slate-50 text-slate-500">
-                                        <tr><th class="p-2.5">الوقت</th><th class="p-2.5">الخط</th><th class="p-2.5">آخر 3 أرقام</th><th class="p-2.5">المبلغ</th><th class="p-2.5">العمولة</th><th class="p-2.5 text-center">إجراءات</th></tr>
+                                        <tr><th class="p-2.5">الوقت</th><th class="p-2.5">الخط</th><th class="p-2.5" x-text="language === 'en' ? 'Last ' + branchExperienceSettings.customerNumberDigits + ' Digits' : 'آخر ' + branchExperienceSettings.customerNumberDigits + ' أرقام'"></th><th class="p-2.5">المبلغ</th><th class="p-2.5">العمولة</th><th class="p-2.5 text-center">إجراءات</th></tr>
                                     </thead>
                                     <tbody class="divide-y divide-slate-100">
                                         <template x-for="t in getFilteredTodayTransactions(type)" :key="t.id">
@@ -764,7 +782,7 @@
                                                 <span x-show="branch.communication?.globalPoll?.id && branch.communication?.pollResponse?.pollId !== branch.communication?.globalPoll?.id" class="font-bold text-amber-700">بانتظار الرد</span>
                                                 <span x-show="!branch.communication?.globalPoll?.id" class="font-bold text-slate-400">—</span>
                                             </td>
-                                            <td class="p-3 text-slate-500 num-en" x-text="branch.communication?.pollResponse?.respondedAt ? new Date(branch.communication.pollResponse.respondedAt).toLocaleString('ar-EG') : '—'"></td>
+                                            <td class="p-3 text-slate-500 num-en" x-text="branch.communication?.pollResponse?.respondedAt ? new Date(branch.communication.pollResponse.respondedAt).toLocaleString(getDateTimeLocale()) : '—'"></td>
                                             <td class="p-3"><button x-show="branch.communication?.globalPoll?.id" @click="deleteBranchQuestion(branch)" :disabled="managerBusy" class="rounded-lg bg-rose-50 px-2.5 py-1.5 font-bold text-rose-700 disabled:opacity-50">حذف السؤال</button></td>
                                         </tr>
                                     </template>
@@ -776,46 +794,86 @@
                 </section>
 
                 <section x-show="managerAdminPage === 'insights'" class="space-y-4">
+                    <nav class="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm" aria-label="أقسام المتابعة الذكية">
+                        <button @click="openManagerInsightSection('overview')" :class="managerInsightSection === 'overview' ? 'bg-indigo-700 text-white' : 'bg-slate-100 text-slate-700'" class="rounded-xl px-3 py-2 text-xs font-extrabold">نظرة عامة</button>
+                        <button @click="openManagerInsightSection('commissions')" :class="managerInsightSection === 'commissions' ? 'bg-indigo-700 text-white' : 'bg-slate-100 text-slate-700'" class="rounded-xl px-3 py-2 text-xs font-extrabold">جدول العمولات</button>
+                        <button @click="openManagerInsightSection('targets')" :class="managerInsightSection === 'targets' ? 'bg-indigo-700 text-white' : 'bg-slate-100 text-slate-700'" class="rounded-xl px-3 py-2 text-xs font-extrabold">أهداف ومكافآت اليوم</button>
+                        <button @click="openManagerInsightSection('audit')" :class="managerInsightSection === 'audit' ? 'bg-indigo-700 text-white' : 'bg-slate-100 text-slate-700'" class="rounded-xl px-3 py-2 text-xs font-extrabold">تعديلات العمليات والسندات</button>
+                        <button @click="openManagerInsightSection('closings')" :class="managerInsightSection === 'closings' ? 'bg-indigo-700 text-white' : 'bg-slate-100 text-slate-700'" class="rounded-xl px-3 py-2 text-xs font-extrabold">التقفيلات ومتوسط الأداء</button>
+                        <button @click="openManagerInsightSection('ledger')" :class="managerInsightSection === 'ledger' ? 'bg-indigo-700 text-white' : 'bg-slate-100 text-slate-700'" class="rounded-xl px-3 py-2 text-xs font-extrabold">الخصومات والمكافآت</button>
+                    </nav>
+                    <div x-show="managerInsightSection === 'overview'" class="space-y-4">
                     <section class="grid gap-3 rounded-2xl border border-indigo-100 bg-white p-4 shadow-sm md:grid-cols-2 xl:grid-cols-3" aria-label="إعدادات المتابعة الذكية">
                         <div class="md:col-span-2 xl:col-span-3">
                             <h3 class="font-extrabold text-slate-900">إعدادات المتابعة والتنبيهات</h3>
-                            <p class="mt-1 text-xs leading-5 text-slate-500">تقارير المدير الدورية كل ساعة. عند توقف العمليات، يظهر للفرع تذكير كل 30 دقيقة وتُحفظ لك رسالة في البريد الداخلي؛ يتصاعد التنبيه بعد 60 دقيقة ويصبح حرجًا بعد 90 دقيقة. لا تُرسل رسائل إلى بريد خارجي.</p>
+                            <p class="mt-1 text-xs leading-5 text-slate-500">فحص أداء الفروع والتذكيرات يتم عند الضغط على زر الفحص فقط. تنبيهات شاشة الكاشير المرتبطة بتسجيل عملية تظل حسب الإعدادات التالية.</p>
                         </div>
-                        <label class="flex items-start gap-3 rounded-xl bg-slate-50 p-3 text-xs font-bold text-slate-700">
-                            <input type="checkbox" :checked="managerMonitoringSettings.reportsEnabled" @change="saveManagerMonitoringSettings('reportsEnabled', $event.target.checked)" :disabled="managerBusy || !managerMonitoringLoaded" class="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600">
-                            <span>تقارير البريد الداخلي كل ساعة<strong class="mt-1 block text-[10px] font-semibold text-slate-500">ترتيب الفروع، الأرباح، العمليات الكبيرة ودون عمولة، النشاط وأرصدة الخطوط.</strong></span>
-                        </label>
                         <label class="flex items-start gap-3 rounded-xl bg-rose-50 p-3 text-xs font-bold text-rose-800">
                             <input type="checkbox" :checked="managerMonitoringSettings.outboundEnabled" @change="saveManagerMonitoringSettings('outboundEnabled', $event.target.checked)" :disabled="managerBusy || !managerMonitoringLoaded" class="mt-0.5 h-4 w-4 rounded border-rose-300 text-rose-600">
                             <span>السماح بتسجيل الرسائل الآلية<strong class="mt-1 block text-[10px] font-semibold text-rose-700">أوقفه لمنع النظام من إنشاء سجلات التنبيهات والتقارير في البريد الداخلي.</strong></span>
                         </label>
                         <label class="flex items-start gap-3 rounded-xl bg-blue-50 p-3 text-xs font-bold text-blue-800">
                             <input type="checkbox" :checked="managerMonitoringSettings.cashierInteractionEnabled" @change="saveManagerMonitoringSettings('cashierInteractionEnabled', $event.target.checked)" :disabled="managerBusy || !managerMonitoringLoaded" class="mt-0.5 h-4 w-4 rounded border-blue-300 text-blue-600">
-                            <span>تفاعل المتابعة مع شاشة الكاشير<strong class="mt-1 block text-[10px] font-semibold text-blue-700">تنبيه فوري للعمولة الصفرية أو المعدلة، بلوغ حد الخط، والمبالغ الكبيرة؛ بلا صوت أو خصومات.</strong></span>
+                            <span>تفاعل المتابعة مع شاشة الكاشير<strong class="mt-1 block text-[10px] font-semibold text-blue-700">تنبيه فوري للعمولة الصفرية أو المختلفة وحد الخط. بعد 3 مخالفات عمولة في اليوم يُسجل اقتراح خصم نصف يوم للمراجعة، ولا يُعتمد دون قرارك.</strong></span>
                         </label>
                         <label class="flex items-start gap-3 rounded-xl bg-amber-50 p-3 text-xs font-bold text-amber-800">
                             <input type="checkbox" :checked="managerMonitoringSettings.remindersEnabled" @change="saveManagerMonitoringSettings('remindersEnabled', $event.target.checked)" :disabled="managerBusy || !managerMonitoringLoaded" class="mt-0.5 h-4 w-4 rounded border-amber-300 text-amber-600">
-                            <span>تذكير توقف العمليات كل 30 دقيقة<strong class="mt-1 block text-[10px] font-semibold text-amber-700">تنبيه عند 30 دقيقة، تصعيد عند 60، وحالة حرجة بعد 90؛ تُسجل رسالة في البريد الداخلي مع كل تذكير حتى يسجل الفرع عملية.</strong></span>
+                            <span>إظهار تنبيهات توقف العمليات عند الفحص اليدوي<strong class="mt-1 block text-[10px] font-semibold text-amber-700">يعرض التنبيه والتصعيد عند الضغط على زر الفحص، من غير فحص دوري أو رسائل تلقائية بين مرات الفحص.</strong></span>
                         </label>
-                        <label class="space-y-1.5 rounded-xl bg-slate-50 p-3 text-xs font-bold text-slate-700">تحديث لوحة المتابعة تلقائيًا
-                            <select :value="managerMonitoringSettings.refreshIntervalMinutes" @change="saveManagerMonitoringSettings('refreshIntervalMinutes', Number($event.target.value))" :disabled="managerBusy || !managerMonitoringLoaded" class="w-full rounded-lg border border-slate-200 bg-white p-2.5">
-                                <option value="1">كل دقيقة</option>
-                                <option value="5">كل 5 دقائق</option>
-                                <option value="15">كل 15 دقيقة</option>
-                                <option value="0">يدوي فقط</option>
-                            </select>
+                        <label class="flex items-start gap-3 rounded-xl bg-indigo-50 p-3 text-xs font-bold text-indigo-800">
+                            <input type="checkbox" :checked="managerMonitoringSettings.closingDraftsEnabled" @change="saveManagerMonitoringSettings('closingDraftsEnabled', $event.target.checked)" :disabled="managerBusy || !managerMonitoringLoaded" class="mt-0.5 h-4 w-4 rounded border-indigo-300 text-indigo-600">
+                            <span>الحفظ التلقائي لمسودات التقفيل على الجهاز<strong class="mt-1 block text-[10px] font-semibold text-indigo-700">يحفظ مدخلات صفحة التقفيل محليًا لكل فرع لتبقى بعد التحديث أو انقطاع الإنترنت. هذا المفتاح يطبق على كل الفروع؛ والمسودات المخزنة تُمسح من زر صفحة التقفيل على كل جهاز.</strong></span>
                         </label>
+                        <div class="space-y-2 rounded-xl bg-slate-50 p-3 text-xs font-bold text-slate-700">
+                            <label class="flex items-start gap-2">
+                                <input type="checkbox" :checked="managerMonitoringSettings.autoRefreshEnabled" @change="saveManagerMonitoringSettings('autoRefreshEnabled', $event.target.checked)" :disabled="managerBusy || !managerMonitoringLoaded" class="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600">
+                                <span>التحديث التلقائي لمؤشرات الأداء<strong class="mt-1 block text-[10px] font-semibold text-slate-500">مغلق افتراضيًا لتقليل قراءات Firestore. عند تشغيله يحدّث المؤشرات فقط أثناء فتح صفحة المتابعة؛ استخدم زر «تحديث البيانات الآن» لتحديث القوائم والتفاصيل.</strong></span>
+                            </label>
+                            <label x-show="managerMonitoringSettings.autoRefreshEnabled" class="block space-y-1 text-[10px] font-bold text-slate-600">تكرار التحديث
+                                <select :value="managerMonitoringSettings.refreshIntervalMinutes" @change="saveManagerMonitoringSettings('refreshIntervalMinutes', Number($event.target.value))" :disabled="managerBusy || !managerMonitoringLoaded" class="w-full rounded-lg border border-slate-200 bg-white p-2">
+                                    <option value="15">كل 15 دقيقة</option>
+                                    <option value="30">كل 30 دقيقة</option>
+                                    <option value="60">كل ساعة</option>
+                                </select>
+                            </label>
+                        </div>
+                        <div class="md:col-span-2 xl:col-span-3 rounded-xl border border-indigo-100 bg-indigo-50/50 p-3">
+                            <h4 class="text-xs font-extrabold text-indigo-900">إعدادات تفاصيل العمليات ورسائل الترتيب</h4>
+                            <p class="mt-1 text-[10px] font-semibold text-slate-500">عدد أرقام العميل ومستويات القرب من المتصدر تُطبق على الفروع ورسائل المتابعة.</p>
+                            <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                                <label class="space-y-1.5 text-xs font-bold text-slate-700">أرقام العميل المسجلة مع العملية
+                                    <select x-model.number="managerMonitoringSettings.customerNumberDigits" :disabled="managerBusy || !managerMonitoringLoaded" class="w-full rounded-lg border border-slate-200 bg-white p-2.5">
+                                        <option :value="3">آخر 3 أرقام</option>
+                                        <option :value="4">آخر 4 أرقام</option>
+                                    </select>
+                                </label>
+                                <label class="space-y-1.5 text-xs font-bold text-slate-700">قرب شديد — فرق حتى %
+                                    <input type="number" min="0" max="98" step="1" x-model.number="managerMonitoringSettings.rankingVeryClosePercent" :disabled="managerBusy || !managerMonitoringLoaded" class="w-full rounded-lg border border-slate-200 bg-white p-2.5 num-en">
+                                </label>
+                                <label class="space-y-1.5 text-xs font-bold text-slate-700">قرب — فرق حتى %
+                                    <input type="number" min="1" max="99" step="1" x-model.number="managerMonitoringSettings.rankingClosePercent" :disabled="managerBusy || !managerMonitoringLoaded" class="w-full rounded-lg border border-slate-200 bg-white p-2.5 num-en">
+                                </label>
+                                <label class="space-y-1.5 text-xs font-bold text-slate-700">بعيد — فرق حتى %
+                                    <input type="number" min="2" max="100" step="1" x-model.number="managerMonitoringSettings.rankingFarPercent" :disabled="managerBusy || !managerMonitoringLoaded" class="w-full rounded-lg border border-slate-200 bg-white p-2.5 num-en">
+                                </label>
+                            </div>
+                            <div class="mt-3 flex flex-wrap items-center justify-between gap-2">
+                                <span class="text-[10px] font-semibold text-slate-500">النسب محسوبة من عمولات الفرع الأول؛ لازم تكون تصاعدية.</span>
+                                <button type="button" @click="saveBranchExperienceSettings()" :disabled="managerBusy || !managerMonitoringLoaded" class="rounded-lg bg-indigo-700 px-4 py-2 text-xs font-extrabold text-white disabled:opacity-50">حفظ إعدادات العمليات والترتيب</button>
+                            </div>
+                        </div>
                         <p x-show="!managerMonitoringLoaded" class="self-center text-xs font-bold text-amber-700">جارٍ تحميل الإعدادات...</p>
                     </section>
                     <div class="manager-insights-hero rounded-2xl p-5 shadow-sm">
                         <div class="flex flex-wrap items-start justify-between gap-3">
                             <div>
                                 <h3 class="text-lg font-black">مركز متابعة أداء الفروع</h3>
-                                <p class="mt-1 text-sm opacity-80">ملخص نشاط الفروع ورسائلك لهم والخطوط المثبتة وحدودها، مع تنبيهات مباشرة ومقارنة عادلة لبيانات اليوم.</p>
-                                <p x-show="managerInsightsLastUpdated" class="mt-2 text-[11px] font-bold opacity-75" x-text="'آخر تحديث: ' + new Date(managerInsightsLastUpdated).toLocaleTimeString('ar-EG') + (Number(managerMonitoringSettings.refreshIntervalMinutes) > 0 ? ' • تحديث تلقائي كل ' + managerMonitoringSettings.refreshIntervalMinutes + ' دقيقة' : ' • التحديث التلقائي متوقف')"></p>
+                                <p class="mt-1 text-sm opacity-80">ملخص نشاط الفروع ورسائلك لهم والخطوط المثبتة وحدودها، مع تنبيهات ومقارنة عادلة لبيانات اليوم.</p>
+                                <p x-show="managerInsightsLastUpdated" class="mt-2 text-[11px] font-bold opacity-75" x-text="'آخر تحديث: ' + new Date(managerInsightsLastUpdated).toLocaleTimeString(getDateTimeLocale()) + (managerMonitoringSettings.autoRefreshEnabled ? ' • تلقائي كل ' + managerMonitoringSettings.refreshIntervalMinutes + ' دقيقة' : ' • يدوي')"></p>
                             </div>
                             <div class="flex flex-wrap gap-2">
-                                <button @click="runManagerMonitoringNow()" :disabled="managerInsightsBusy || managerManualRunBusy" class="rounded-xl bg-emerald-400 px-4 py-2 text-xs font-extrabold text-emerald-950 shadow-sm hover:bg-emerald-300 disabled:opacity-50" x-text="managerManualRunBusy ? 'بنراجع الفروع وبنحفظ التقرير...' : 'تحديث البيانات وحفظ التقرير في البريد الداخلي'"></button>
+                                <button @click="refreshManagerDashboard()" :disabled="managerDashboardRefreshBusy || managerInsightsBusy || managerManualRunBusy" class="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-extrabold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50" x-text="managerDashboardRefreshBusy ? 'جارٍ تحديث البيانات...' : 'تحديث البيانات الآن'"></button>
+                                <button @click="runManagerMonitoringNow()" :disabled="managerInsightsBusy || managerManualRunBusy || managerDashboardRefreshBusy" class="rounded-xl bg-emerald-400 px-4 py-2 text-xs font-extrabold text-emerald-950 shadow-sm hover:bg-emerald-300 disabled:opacity-50" x-text="managerManualRunBusy ? 'بنراجع الفروع وبنحفظ التقرير...' : 'فحص الفروع وحفظ التقرير'"></button>
                             </div>
                         </div>
                     </div>
@@ -850,7 +908,7 @@
                     <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                         <div class="border-b border-slate-100 p-4">
                             <h3 class="font-extrabold text-slate-900">تنبيهات المتابعة الذكية للموظفين</h3>
-                            <p class="mt-1 text-xs text-slate-500">يعرض التنبيه الحالي وسجل آخر التنبيهات بأوقاتها. النظام لا يخصم أو يهدد الموظف تلقائيًا؛ التنبيه الأعلى يفضل بموافقتك.</p>
+                            <p class="mt-1 text-xs text-slate-500">يعرض التنبيه الحالي وسجل آخر التنبيهات بأوقاتها. رسائل الفرع حازمة ومحترمة، والخصم المقترح لا يُعتمد إلا بقرارك.</p>
                         </div>
                         <div class="grid gap-3 p-4 md:grid-cols-2">
                             <template x-for="branch in managedBranches.filter(item => item.communication?.assistantNotice?.id || item.monitoringAlertHistory?.length)" :key="'assistant-notice-' + branch.id">
@@ -858,7 +916,7 @@
                                     <div x-show="branch.communication?.assistantNotice?.id" class="flex items-start justify-between gap-3">
                                         <div class="min-w-0">
                                             <h4 class="text-sm font-extrabold text-slate-900" x-text="branch.name"></h4>
-                                            <p class="mt-1 text-[10px] font-bold text-slate-500 num-en" x-text="branch.communication?.assistantNotice?.createdAt ? new Date(branch.communication.assistantNotice.createdAt).toLocaleString('ar-EG') : ''"></p>
+                                            <p class="mt-1 text-[10px] font-bold text-slate-500 num-en" x-text="branch.communication?.assistantNotice?.createdAt ? new Date(branch.communication.assistantNotice.createdAt).toLocaleString(getDateTimeLocale()) : ''"></p>
                                             <p class="mt-1 whitespace-pre-wrap text-xs font-bold text-slate-700" x-text="branch.communication?.assistantNotice?.message"></p>
                                             <span class="mt-2 inline-flex rounded-full px-2 py-1 text-[10px] font-extrabold" :class="branch.communication?.assistantNoticeRead?.noticeId === branch.communication?.assistantNotice?.id ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'" x-text="branch.communication?.assistantNoticeRead?.noticeId === branch.communication?.assistantNotice?.id ? 'أكد الفرع الاستلام' : 'بانتظار تأكيد الفرع'"></span>
                                         </div>
@@ -868,7 +926,7 @@
                                         <h5 class="mb-1 text-[10px] font-black text-slate-600">آخر التنبيهات ووقتها</h5>
                                         <template x-for="alert in (branch.monitoringAlertHistory || []).slice(0, 5)" :key="alert.id">
                                             <div class="border-t border-slate-100 py-2">
-                                                <p class="text-[10px] font-bold text-slate-500 num-en" x-text="alert.createdAt ? new Date(alert.createdAt).toLocaleString('ar-EG') : 'وقت غير متاح'"></p>
+                                                <p class="text-[10px] font-bold text-slate-500 num-en" x-text="alert.createdAt ? new Date(alert.createdAt).toLocaleString(getDateTimeLocale()) : 'وقت غير متاح'"></p>
                                                 <p class="mt-0.5 whitespace-pre-wrap text-xs font-semibold text-slate-700" x-text="alert.message"></p>
                                             </div>
                                         </template>
@@ -958,6 +1016,166 @@
                         <i data-lucide="trending-up"></i>
                         <span x-text="getManagerChallengeText()"></span>
                     </div>
+                    </div>
+                    <section x-show="managerInsightSection === 'commissions'" class="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <div>
+                            <h3 class="font-extrabold text-slate-900">جدول العمولة التلقائية — موحد لكل الفروع</h3>
+                            <p class="mt-1 text-xs leading-5 text-slate-500">العمولة المتوقعة تُملأ تلقائيًا للإيداع والسحب. يظل التعديل حسب صلاحية الفرع، وأي فرق عن الجدول يظهر في سجل المخالفات والبريد الداخلي. كل حد يبدأ منه السعر التالي؛ وبعد آخر حد تزيد العمولة بالقيمة المحددة.</p>
+                        </div>
+                        <div class="grid gap-3 sm:grid-cols-2">
+                            <label class="space-y-1 text-xs font-bold text-slate-600">الزيادة في مبلغ الشريحة بعد آخر حد
+                                <input type="number" min="1" step="1" x-model.number="managerCommissionRules.incrementAmount" class="w-full rounded-lg border border-slate-200 bg-slate-50 p-2.5 num-en">
+                            </label>
+                            <label class="space-y-1 text-xs font-bold text-slate-600">الزيادة في العمولة بعد آخر حد
+                                <input type="number" min="0" step="1" x-model.number="managerCommissionRules.incrementFee" class="w-full rounded-lg border border-slate-200 bg-slate-50 p-2.5 num-en">
+                            </label>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full min-w-[420px] text-right text-xs">
+                                <thead class="bg-slate-50 text-slate-500"><tr><th class="p-3">يبدأ المبلغ من</th><th class="p-3">العمولة المتوقعة</th><th class="p-3">إجراء</th></tr></thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    <template x-for="(tier, index) in managerCommissionRules.tiers" :key="'commission-tier-' + index">
+                                        <tr>
+                                            <td class="p-2"><input type="number" min="0" step="1" x-model.number="tier.minAmount" class="w-full rounded-lg border border-slate-200 p-2 num-en" :aria-label="'بداية الشريحة ' + (index + 1)"></td>
+                                            <td class="p-2"><input type="number" min="0" step="0.01" x-model.number="tier.fee" class="w-full rounded-lg border border-slate-200 p-2 num-en" :aria-label="'عمولة الشريحة ' + (index + 1)"></td>
+                                            <td class="p-2"><button @click="removeCommissionTier(index)" :disabled="managerCommissionRules.tiers.length <= 1" class="rounded-lg bg-rose-50 px-3 py-2 font-bold text-rose-700 disabled:opacity-40">حذف</button></td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="flex flex-wrap justify-between gap-2">
+                            <button @click="addCommissionTier()" class="rounded-xl bg-slate-100 px-4 py-2 text-xs font-extrabold text-slate-700">إضافة شريحة</button>
+                            <button @click="saveManagerCommissionRules()" :disabled="managerCommissionRulesSaving" class="rounded-xl bg-indigo-700 px-5 py-2 text-xs font-extrabold text-white disabled:opacity-50" x-text="managerCommissionRulesSaving ? 'جارٍ الحفظ...' : 'حفظ جدول العمولات'"></button>
+                        </div>
+                        <div class="overflow-x-auto rounded-xl border border-amber-100">
+                            <table class="w-full min-w-[720px] text-right text-xs">
+                                <thead class="bg-amber-50 text-amber-900"><tr><th class="p-3">الفرع</th><th class="p-3">النوع</th><th class="p-3">المبلغ</th><th class="p-3">المتوقع</th><th class="p-3">المسجل</th><th class="p-3">التاريخ</th></tr></thead>
+                                <tbody class="divide-y divide-amber-50">
+                                    <template x-for="alert in getManagerCommissionAlerts()" :key="alert.id">
+                                        <tr>
+                                            <td class="p-3 font-bold" x-text="alert.branchName"></td>
+                                            <td class="p-3" x-text="alert.type === 'zero_fee' ? 'عمولة صفر' : 'عمولة مختلفة'"></td>
+                                            <td class="p-3 num-en" x-text="formatMoney(alert.amount || 0) + ' ج'"></td>
+                                            <td class="p-3 num-en" x-text="formatMoney(alert.expectedFee || 0) + ' ج'"></td>
+                                            <td class="p-3 font-bold text-rose-700 num-en" x-text="formatMoney(alert.actualFee || 0) + ' ج'"></td>
+                                            <td class="p-3 num-en" x-text="alert.createdAt ? new Date(alert.createdAt).toLocaleString(getDateTimeLocale()) : '—'"></td>
+                                        </tr>
+                                    </template>
+                                    <tr x-show="getManagerCommissionAlerts().length === 0"><td colspan="6" class="p-5 text-center text-slate-500">لا توجد مخالفات عمولة مسجلة.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                    <section x-show="managerInsightSection === 'targets'" class="space-y-4">
+                        <section class="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm">
+                            <div class="flex flex-wrap items-start justify-between gap-3">
+                                <div><h3 class="font-extrabold text-slate-900">هدف ربح الشيفت اليومي</h3><p class="mt-1 text-xs text-slate-500">الإنجاز يُحسب من ربح الشيفت المسجل، والمكافأة تُضاف مرة واحدة لسجل الفرع عند تحقيق الهدف؛ التسجيل لا ينفذ تحويلًا ماليًا.</p></div>
+                                <label class="flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-extrabold text-emerald-800"><input type="checkbox" x-model="dailyTargets.enabled" class="h-4 w-4 rounded border-emerald-300"> تفعيل الهدف اليومي</label>
+                            </div>
+                            <div class="mt-4 grid gap-3 md:grid-cols-3">
+                                <label class="space-y-1 text-xs font-bold text-slate-600">تاريخ الهدف
+                                    <input type="date" x-model="dailyTargets.date" class="w-full rounded-lg border border-slate-200 p-2.5 num-en">
+                                </label>
+                                <label class="space-y-1 text-xs font-bold text-slate-600">هدف الربح العام
+                                    <input type="number" min="0" step="1" x-model.number="dailyTargets.targetProfit" class="w-full rounded-lg border border-slate-200 p-2.5 num-en">
+                                </label>
+                                <label class="space-y-1 text-xs font-bold text-slate-600">قيمة المكافأة العامة
+                                    <input type="number" min="0" step="1" x-model.number="dailyTargets.rewardAmount" class="w-full rounded-lg border border-slate-200 p-2.5 num-en">
+                                </label>
+                            </div>
+                            <div class="mt-4 overflow-x-auto">
+                                <table class="w-full min-w-[650px] text-right text-xs">
+                                    <thead class="bg-slate-50 text-slate-500"><tr><th class="p-3">الفرع</th><th class="p-3">تفعيل</th><th class="p-3">الهدف</th><th class="p-3">المكافأة</th><th class="p-3">التقدم الحالي</th></tr></thead>
+                                    <tbody class="divide-y divide-slate-100">
+                                        <template x-for="branch in managedBranches" :key="'target-branch-' + branch.id">
+                                            <tr>
+                                                <td class="p-3 font-extrabold" x-text="branch.name"></td>
+                                                <td class="p-3"><input type="checkbox" x-model="dailyTargets.branches[branch.id].enabled" class="h-4 w-4 rounded border-slate-300 text-emerald-600" :aria-label="'تفعيل هدف ' + branch.name"></td>
+                                                <td class="p-2"><input type="number" min="0" step="1" x-model.number="dailyTargets.branches[branch.id].targetProfit" class="w-full rounded-lg border border-slate-200 p-2 num-en" :placeholder="formatMoney(dailyTargets.targetProfit) + ' (العام)'"></td>
+                                                <td class="p-2"><input type="number" min="0" step="1" x-model.number="dailyTargets.branches[branch.id].rewardAmount" class="w-full rounded-lg border border-slate-200 p-2 num-en" :placeholder="formatMoney(dailyTargets.rewardAmount) + ' (العامة)'"></td>
+                                                <td class="p-3 num-en" x-text="formatMoney(getBranchShiftProfit(branch.id)) + ' / ' + formatMoney(dailyTargets.branches[branch.id].targetProfit ?? dailyTargets.targetProfit) + ' ج'"></td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                                <p class="mt-2 text-[10px] font-semibold text-slate-500">اترك هدف أو مكافأة الفرع فارغة لاستخدام القيمة العامة. عند إيقاف هدف الفرع من الجدول لا تُسجل له مكافأة.</p>
+                            </div>
+                            <div class="mt-4 flex justify-end"><button @click="saveManagerDailyTargets()" :disabled="managerDailyTargetSaving" class="rounded-xl bg-emerald-700 px-5 py-2.5 text-xs font-extrabold text-white disabled:opacity-50" x-text="managerDailyTargetSaving ? 'جارٍ الحفظ...' : 'حفظ أهداف اليوم'"></button></div>
+                        </section>
+                    </section>
+                    <section x-show="managerInsightSection === 'audit'" class="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <div class="flex flex-wrap items-center justify-between gap-3">
+                            <div><h3 class="font-extrabold text-slate-900">سجل تعديل وحذف العمليات والسندات</h3><p class="mt-1 text-xs text-slate-500">يعرض كل التعديلات وعمليات الحذف المسجلة مع الحساب والقيم قبل وبعد.</p></div>
+                            <div class="flex gap-2">
+                                <select x-model="managerAuditFilter" @change="loadManagerAuditLogs()" class="rounded-lg border border-slate-200 bg-white p-2 text-xs font-bold">
+                                    <option value="all">كل التعديلات والحذف</option><option value="transactions">العمليات</option><option value="vouchers">السندات</option>
+                                </select>
+                                <button @click="loadManagerAuditLogs()" :disabled="managerAuditLoading" class="rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold" x-text="managerAuditLoading ? 'جارٍ التحميل...' : 'تحديث السجل'"></button>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full min-w-[850px] text-right text-xs">
+                                <thead class="bg-slate-50 text-slate-500"><tr><th class="p-3">الوقت</th><th class="p-3">الفرع</th><th class="p-3">الحساب</th><th class="p-3">الحدث</th><th class="p-3">السجل</th><th class="p-3">تفاصيل التغيير</th></tr></thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    <template x-for="entry in getFilteredManagerAuditLogs()" :key="entry.id">
+                                        <tr>
+                                            <td class="p-3 whitespace-nowrap num-en" x-text="entry.occurredAt ? new Date(entry.occurredAt).toLocaleString(getDateTimeLocale()) : '—'"></td>
+                                            <td class="p-3 font-bold" x-text="entry.branchName"></td><td class="p-3" dir="ltr" x-text="entry.actorEmail || entry.actorUid"></td>
+                                            <td class="p-3 font-bold" x-text="entry.action === 'updated' ? 'تعديل' : 'حذف'"></td><td class="p-3" x-text="(entry.collection === 'transactions' ? 'عمليات' : 'سندات') + ' / ' + entry.recordId"></td>
+                                            <td class="p-3 whitespace-pre-wrap" x-text="formatManagerAuditDetails(entry.details)"></td>
+                                        </tr>
+                                    </template>
+                                    <tr x-show="getFilteredManagerAuditLogs().length === 0"><td colspan="6" class="p-5 text-center text-slate-500" x-text="managerAuditLoading ? 'جارٍ تحميل السجل...' : 'لا توجد تعديلات أو عمليات حذف في السجل الحالي.'"></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                    <section x-show="managerInsightSection === 'closings'" class="space-y-4">
+                        <p x-show="managerInsightsError" x-text="managerInsightsError" role="alert" class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-bold text-rose-700"></p>
+                        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                            <article class="rounded-2xl border border-indigo-100 bg-white p-4 shadow-sm"><p class="text-xs font-bold text-slate-500">متوسط ربح الفرع اليومي — من أول الشهر</p><strong class="mt-2 block text-xl font-black text-indigo-800 num-en" x-text="managerBranchMetrics.length ? formatMoney(managerBranchMetrics.reduce((sum, branch) => sum + branch.averageDailyProfit, 0) / managerBranchMetrics.length) + ' ج' : '—'"></strong></article>
+                            <article class="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm"><p class="text-xs font-bold text-slate-500">إجمالي التقفيلات المعتمدة هذا الشهر</p><strong class="mt-2 block text-xl font-black text-emerald-800 num-en" x-text="managerBranchMetrics.reduce((sum, branch) => sum + branch.monthClosingsCount, 0)"></strong></article>
+                            <article class="rounded-2xl border border-amber-100 bg-white p-4 shadow-sm"><p class="text-xs font-bold text-slate-500">متوسط العمليات اليومي للفروع</p><strong class="mt-2 block text-xl font-black text-amber-800 num-en" x-text="managerBranchMetrics.length ? formatMoney(managerBranchMetrics.reduce((sum, branch) => sum + branch.averageDailyTransactions, 0) / managerBranchMetrics.length) : '—'"></strong></article>
+                            <article class="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm"><p class="text-xs font-bold text-slate-500">متوسط ربح الشيفت اليوم — آخر تحديث</p><strong class="mt-2 block text-xl font-black text-blue-800 num-en" x-text="managerInsightsLastUpdated ? new Date(managerInsightsLastUpdated).toLocaleTimeString(getDateTimeLocale()) : '—'"></strong></article>
+                        </div>
+                        <section class="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+                            <table class="w-full min-w-[900px] text-right text-xs">
+                                <thead class="bg-slate-50 text-slate-500"><tr><th class="p-3">الفرع</th><th class="p-3">تقفيلات الشهر</th><th class="p-3">ربح الشهر</th><th class="p-3">متوسط الربح / يوم</th><th class="p-3">عمليات الشهر</th><th class="p-3">متوسط العمليات / يوم</th><th class="p-3">آخر تقفيلة</th></tr></thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    <template x-for="branch in managerBranchMetrics" :key="'monthly-branch-' + branch.id">
+                                        <tr><td class="p-3 font-extrabold" x-text="branch.name"></td><td class="p-3 num-en" x-text="branch.monthClosingsCount"></td><td class="p-3 num-en" x-text="formatMoney(branch.monthProfit) + ' ج'"></td><td class="p-3 font-bold text-indigo-700 num-en" x-text="formatMoney(branch.averageDailyProfit) + ' ج'"></td><td class="p-3 num-en" x-text="branch.monthTransactions"></td><td class="p-3 num-en" x-text="formatMoney(branch.averageDailyTransactions)"></td><td class="p-3 num-en" x-text="branch.latestClosing ? new Date(getRecordDateTime(branch.latestClosing)).toLocaleString(getDateTimeLocale()) : 'لا توجد تقفيلة هذا الشهر'"></td></tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </section>
+                        <section class="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+                            <div class="border-b border-slate-100 p-4"><h3 class="font-extrabold text-slate-900">تقفيلات الفروع</h3><p class="mt-1 text-xs text-slate-500">تُعرض التقفيلات المحفوظة فقط؛ الربح الشهري يجمع عمولات العمليات وربح المكن، ويُقسم المتوسط على أيام الشهر المنقضية حتى اليوم.</p></div>
+                            <table class="w-full min-w-[800px] text-right text-xs">
+                                <thead class="bg-slate-50 text-slate-500"><tr><th class="p-3">التاريخ</th><th class="p-3">الفرع</th><th class="p-3">ربح الشيفت</th><th class="p-3">فرق التسوية</th><th class="p-3">عدد العمليات</th><th class="p-3">المكن</th></tr></thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    <template x-for="closing in managerClosingRows" :key="'closing-row-' + closing.branchId + '-' + closing.id">
+                                        <tr><td class="p-3 num-en" x-text="new Date(getRecordDateTime(closing)).toLocaleString(getDateTimeLocale())"></td><td class="p-3 font-bold" x-text="closing.branchName"></td><td class="p-3 num-en" x-text="formatMoney(closing.profit || 0) + ' ج'"></td><td class="p-3 num-en" x-text="formatMoney(closing.variance || 0) + ' ج'"></td><td class="p-3 num-en" x-text="(closing.transactions || []).length"></td><td class="p-3 num-en" x-text="formatMoney(closing.machineProfit || 0) + ' ج'"></td></tr>
+                                    </template>
+                                    <tr x-show="managerClosingRows.length === 0"><td colspan="6" class="p-5 text-center text-slate-500">لا توجد تقفيلات محفوظة.</td></tr>
+                                </tbody>
+                            </table>
+                        </section>
+                    </section>
+                    <section x-show="managerInsightSection === 'ledger'" class="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <div><h3 class="font-extrabold text-slate-900">سجل الخصومات المقترحة والمكافآت</h3><p class="mt-1 text-xs text-slate-500">الخصم بعد المخالفة الثالثة يظل اقتراحًا ولا يُعتمد إلا بقرارك؛ اعتماد السجل لا ينفذ خصمًا من رصيد مالي. الحسابات الحالية على مستوى الفرع، ولا تحدد موظفًا فرديًا. المكافآت تُسجل تلقائيًا مرة واحدة عند تحقق الهدف المفعّل ولا تنفذ تحويلًا ماليًا.</p></div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full min-w-[780px] text-right text-xs">
+                                <thead class="bg-slate-50 text-slate-500"><tr><th class="p-3">التاريخ</th><th class="p-3">الفرع</th><th class="p-3">النوع</th><th class="p-3">التفاصيل</th><th class="p-3">الحالة</th><th class="p-3">المراجعة</th></tr></thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    <template x-for="entry in managerLedgers" :key="entry.id">
+                                        <tr><td class="p-3 num-en" x-text="entry.date || '—'"></td><td class="p-3 font-bold" x-text="entry.branchName"></td><td class="p-3" x-text="entry.type === 'bonus' ? 'مكافأة' : 'خصم مقترح'"></td><td class="p-3" x-text="entry.type === 'bonus' ? 'ربح ' + formatMoney(entry.actualProfit || 0) + ' ج من هدف ' + formatMoney(entry.targetProfit || 0) + ' ج — مكافأة ' + formatMoney(entry.rewardAmount || 0) + ' ج' : entry.proposedLabel + ' بعد ' + entry.strikeCount + ' مخالفات'"></td><td class="p-3 font-bold" x-text="entry.status === 'pending' ? 'بانتظار اعتمادك' : entry.status === 'approved' ? 'معتمد' : entry.status === 'rejected' ? 'مرفوض' : 'مسجل تلقائيًا'"></td><td class="p-3"><div x-show="entry.type === 'deduction' && entry.status === 'pending'" class="flex gap-2"><button @click="reviewManagerLedger(entry.id, 'approved')" :disabled="managerBusy" class="rounded-lg bg-rose-600 px-2.5 py-1.5 font-bold text-white disabled:opacity-50">اعتماد الخصم</button><button @click="reviewManagerLedger(entry.id, 'rejected')" :disabled="managerBusy" class="rounded-lg bg-slate-100 px-2.5 py-1.5 font-bold text-slate-700 disabled:opacity-50">رفض</button></div></td></tr>
+                                    </template>
+                                    <tr x-show="managerLedgers.length === 0"><td colspan="6" class="p-5 text-center text-slate-500">لا توجد خصومات مقترحة أو مكافآت مسجلة بعد.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
                 </section>
 
                 <section x-show="managerAdminPage === 'emails'" class="manager-email-page space-y-4" aria-label="سجل البريد المرسل">
@@ -1236,16 +1454,25 @@
 
             <!-- TAB 1: SHIFT CLOSING (تقفيل اليوم والتسوية) -->
             <template x-if="adminTab === 'closing'">
-            <div data-workflow-group="closing" class="space-y-4">
+            <div data-workflow-group="closing" class="closing-layout" @input="saveClosingDraft()">
                 
-                <div class="closing-section bg-white rounded-2xl border border-slate-200 p-3 shadow-sm space-y-3">
+                <div class="closing-section closing-top-card closing-intro-card rounded-2xl border border-slate-200 bg-white p-3 shadow-sm space-y-3">
                     <div class="flex justify-between items-center border-b border-slate-100 pb-3">
-                        <h3 class="font-extrabold text-slate-800 text-lg flex items-center gap-2">
-                            <i data-lucide="shield-check" class="w-6 h-6 text-emerald-600"></i> جرد وتقفيل اليومية الشامل
-                        </h3>
+                        <div>
+                            <h3 class="font-extrabold text-slate-800 text-lg flex items-center gap-2">
+                                <i data-lucide="shield-check" class="w-6 h-6 text-emerald-600"></i> جرد وتقفيل اليومية الشامل
+                            </h3>
+                            <p x-show="closingDraftStatus" x-text="closingDraftStatus" role="status" class="mt-1 text-[10px] font-bold text-emerald-700"></p>
+                            <p x-show="closingDraftError" x-text="closingDraftError" role="alert" class="mt-1 text-[10px] font-bold text-rose-700"></p>
+                            <p x-show="!closingDraftSettingReady" class="mt-1 text-[10px] font-bold text-slate-500">جارٍ تحميل حالة الحفظ المحلي...</p>
+                            <p x-show="closingDraftSettingReady && !closingDraftsEnabled" class="mt-1 text-[10px] font-bold text-amber-700">الحفظ التلقائي المحلي متوقف من إدارة المتابعة.</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button type="button" @click="clearClosingDraft()" class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-[10px] font-extrabold text-rose-700 hover:bg-rose-100">مسح المسودة المحفوظة من هذا الجهاز</button>
                         <span class="text-xs bg-slate-100 text-slate-600 font-bold px-3 py-1 rounded-full" x-text="'تاريخ التقفيل: ' + currentDateStr"></span>
+                        </div>
                     </div>
-                    <div class="grid grid-cols-1 gap-3 rounded-xl border border-blue-100 bg-blue-50/60 p-3 md:grid-cols-3">
+                    <div class="closing-summary-cards grid grid-cols-1 gap-3 rounded-xl border border-blue-100 bg-blue-50/60 p-3">
                         <label class="block text-xs font-extrabold text-slate-700">
                             الرصيد الافتتاحي (ج)
                             <input type="text" inputmode="decimal" x-model="masterOpeningBalance" @change="commitClosingOpeningBalance()" data-workflow-field class="mt-1.5 w-full rounded-lg border border-blue-200 bg-white p-2.5 text-base font-black text-slate-900 num-en">
@@ -1259,10 +1486,16 @@
                             <div class="mt-1.5 flex min-h-[42px] w-full items-center rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-base font-black text-amber-700 num-en" x-text="formatMoney(calculateShiftClosingProfit()) + ' ج'"></div>
                             <span class="mt-1 block text-[10px] font-semibold text-slate-500">العمولات + ربح المكن التقديري</span>
                         </div>
+                        <div class="rounded-lg border border-indigo-100 bg-indigo-50 p-2.5">
+                            <span class="block text-xs font-extrabold text-indigo-800">ترتيب الفرع اليوم</span>
+                            <span class="mt-1.5 flex min-h-[42px] items-center text-base font-black text-indigo-900" x-text="currentBranch?.communication?.performanceStatus?.rank ? 'المركز ' + currentBranch.communication.performanceStatus.rank + ' من ' + currentBranch.communication.performanceStatus.totalBranches : 'غير متاح'"></span>
+                        </div>
                     </div>
                 </div>
 
-                <div class="closing-section bg-white rounded-2xl border border-slate-200 p-3 shadow-sm space-y-3">
+                <div class="closing-assets-row">
+                <div class="closing-cash-column">
+                <div class="closing-section closing-cash-panel bg-white rounded-2xl border border-slate-200 p-3 shadow-sm space-y-3">
                     <h4 class="font-extrabold text-slate-800 text-sm flex items-center gap-2">
                         <i data-lucide="banknote" class="w-5 h-5 text-emerald-600"></i> النقدية
                     </h4>
@@ -1288,33 +1521,7 @@
                             </tbody>
                         </table>
                     </div>
-                </div>
-
-                <div class="closing-section bg-white rounded-2xl border border-slate-200 p-3 shadow-sm space-y-3">
-                    <h4 class="font-extrabold text-slate-800 text-sm flex items-center gap-2">
-                        <i data-lucide="cpu" class="w-5 h-5 text-blue-600"></i> أرصدة المكن
-                    </h4>
-                    <div class="max-h-80 overflow-auto rounded-xl border border-slate-200">
-                        <table class="w-full min-w-[520px] text-right text-xs">
-                            <thead class="sticky top-0 z-10 bg-slate-100 text-slate-600">
-                                <tr><th class="p-2">اسم المكنة</th><th class="p-2">الرصيد المتوقع</th><th class="p-2">الرصيد الفعلي</th><th class="p-2">الفرق</th></tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-100">
-                                <template x-for="row in getClosingWalletRows('machine')" :key="row.wallet.id">
-                                    <tr class="bg-white hover:bg-blue-50/50">
-                                        <td class="p-2 font-bold text-slate-700" x-text="row.wallet.name"></td>
-                                        <td class="p-2 font-bold text-slate-500 num-en" x-text="formatMoney(row.wallet.balance) + ' ج'"></td>
-                                        <td class="p-1.5"><input type="text" inputmode="decimal" x-model="closingInputs.walletBalances[row.wallet.id]" placeholder="الرصيد الفعلي" data-workflow-field class="w-full min-w-32 rounded-lg border border-slate-300 bg-white p-2 font-black text-slate-900 num-en"></td>
-                                        <td class="p-2 font-black num-en" :class="getClosingWalletVariance(row.wallet) < 0 ? 'text-rose-600' : 'text-emerald-700'" x-text="formatMoney(getClosingWalletVariance(row.wallet)) + ' ج'"></td>
-                                    </tr>
-                                </template>
-                                <tr x-show="getClosingWalletRows('machine').length === 0"><td colspan="4" class="p-4 text-center text-slate-500">لا توجد مكن عليها رصيد.</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div class="closing-section bg-white rounded-2xl border border-violet-100 p-3 shadow-sm">
+                    <div class="border-t border-slate-100 pt-3">
                     <h4 class="mb-2 flex items-center gap-2 text-sm font-extrabold text-slate-800">
                         <i data-lucide="landmark" class="h-5 w-5 text-violet-600"></i> أرصدة حسابات إنستا باي
                     </h4>
@@ -1338,21 +1545,47 @@
                             </tbody>
                         </table>
                     </div>
+                    </div>
+                </div>
+                </div>
+                    <div class="closing-section closing-machine-panel bg-white rounded-2xl border border-slate-200 p-3 shadow-sm space-y-3">
+                        <h4 class="font-extrabold text-slate-800 text-sm flex items-center gap-2">
+                            <i data-lucide="cpu" class="w-5 h-5 text-blue-600"></i> أرصدة المكن
+                        </h4>
+                        <div class="max-h-80 overflow-auto rounded-xl border border-slate-200">
+                            <table class="w-full min-w-[520px] text-right text-xs">
+                                <thead class="sticky top-0 z-10 bg-slate-100 text-slate-600">
+                                    <tr><th class="p-2">اسم المكنة</th><th class="p-2">الرصيد المتوقع</th><th class="p-2">الرصيد الفعلي</th><th class="p-2">الفرق</th></tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    <template x-for="row in getClosingWalletRows('machine')" :key="row.wallet.id">
+                                        <tr class="bg-white hover:bg-blue-50/50">
+                                            <td class="p-2 font-bold text-slate-700" x-text="row.wallet.name"></td>
+                                            <td class="p-2 font-bold text-slate-500 num-en" x-text="formatMoney(row.wallet.balance) + ' ج'"></td>
+                                            <td class="p-1.5"><input type="text" inputmode="decimal" x-model="closingInputs.walletBalances[row.wallet.id]" placeholder="الرصيد الفعلي" data-workflow-field class="w-full min-w-32 rounded-lg border border-slate-300 bg-white p-2 font-black text-slate-900 num-en"></td>
+                                            <td class="p-2 font-black num-en" :class="getClosingWalletVariance(row.wallet) < 0 ? 'text-rose-600' : 'text-emerald-700'" x-text="formatMoney(getClosingWalletVariance(row.wallet)) + ' ج'"></td>
+                                        </tr>
+                                    </template>
+                                    <tr x-show="getClosingWalletRows('machine').length === 0"><td colspan="4" class="p-4 text-center text-slate-500">لا توجد مكن عليها رصيد.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="closing-section bg-white rounded-2xl border border-blue-100 p-3 shadow-sm">
+                <div class="closing-section closing-lines-panel rounded-2xl border border-blue-100 bg-white p-3 shadow-sm">
                     <h4 class="mb-2 flex items-center gap-2 text-sm font-extrabold text-slate-800">
                         <i data-lucide="smartphone" class="h-5 w-5 text-blue-600"></i> أرصدة الخطوط
                     </h4>
                     <p class="mb-2 text-[11px] font-semibold text-slate-500">اسحب الخط لتغيير ترتيبه؛ كل تليفون يضم خطين. الخطوط ذات الرصيد صفر لا تظهر.</p>
-                    <div class="max-h-[28rem] overflow-auto rounded-xl border border-blue-100">
+                    <div class="overflow-x-auto rounded-xl border border-blue-100">
                         <table class="w-full min-w-[760px] text-right text-xs">
                             <thead class="sticky top-0 z-10 bg-blue-50 text-blue-900">
                                 <tr><th class="p-2">ترتيب التليفون</th><th class="p-2">اسم الخط</th><th class="p-2">رقم الخط</th><th class="p-2">الرصيد المتوقع</th><th class="p-2">الرصيد الفعلي</th><th class="p-2">الفرق</th><th class="w-10 p-2 text-center">نقل</th></tr>
                             </thead>
                             <tbody class="divide-y divide-blue-50">
                                 <template x-for="row in getClosingWalletRows('line')" :key="row.wallet.id">
-                                    <tr @dragover.prevent @drop.prevent="moveClosingWallet(row.wallet.id, 'line')" class="bg-white hover:bg-blue-50/50">
+                                    <tr @dragover.prevent @drop.prevent="moveClosingWallet(row.wallet.id, 'line')" :class="row.phone % 2 === 1 ? 'bg-sky-50/70 hover:bg-sky-100/60' : 'bg-white hover:bg-slate-50'">
                                         <td class="whitespace-nowrap p-2 font-bold text-blue-800" x-text="'تليفون ' + row.phone"></td>
                                         <td class="p-2 font-bold text-slate-700" x-text="row.wallet.name"></td>
                                         <td class="p-2 font-bold text-slate-500 num-en" x-text="row.wallet.phone"></td>
@@ -1369,7 +1602,7 @@
                 </div>
 
                 <!-- LIVE RECONCILIATION REPORT ENGINE -->
-                <div class="bg-white rounded-2xl border-2 border-slate-900 p-4 shadow-sm space-y-3">
+                <div class="closing-report-panel rounded-2xl border-2 border-slate-900 bg-white p-4 shadow-sm space-y-3">
                     <h4 class="font-black text-slate-900 text-base border-b border-slate-200 pb-2 flex items-center gap-2">
                         <i data-lucide="pie-chart" class="w-5 h-5 text-indigo-600"></i> التقرير اللحظي الشامل لمطابقة الحسابات والعجز / الزيادة
                     </h4>
@@ -1378,7 +1611,7 @@
                     <div x-data="{ audit: {}, scheduleAuditRefresh() { window.clearTimeout(this.$el._auditTimer); this.$el._auditTimer = window.setTimeout(() => { this.audit = this.calculateFullAudit(); }, 120); } }" x-init="audit = calculateFullAudit()" x-effect="masterOpeningBalance; closingInputs.actualDrawerCash; closingInputs.machineProfit; Object.values(closingInputs.walletBalances).join('|'); wallets.length; transactions.length; vouchers.length; customers.length; closingHistory.length; scheduleAuditRefresh()">
                         <div class="space-y-3">
                             
-                            <div class="grid grid-cols-2 gap-2 text-center sm:grid-cols-3 xl:grid-cols-7">
+                            <div class="closing-audit-summary grid grid-cols-2 gap-2 text-center sm:grid-cols-3">
                                 <div class="bg-slate-100 p-2.5 rounded-xl">
                                     <span class="text-[11px] text-slate-500 font-bold block">كاش الدرج</span>
                                     <span class="text-sm font-black text-slate-900 num-en" x-text="formatMoney(audit.actualDrawer) + ' ج'"></span>
@@ -1486,7 +1719,7 @@
                         <h5 class="mb-2 font-extrabold text-slate-800">كل عمليات الفترة</h5>
                         <div class="max-h-80 overflow-auto rounded-xl border border-slate-200">
                             <table class="w-full min-w-[760px] text-right text-xs">
-                                <thead class="sticky top-0 bg-slate-100 text-slate-600"><tr><th class="p-2">التاريخ والوقت</th><th class="p-2">النوع</th><th class="p-2">الخط</th><th class="p-2">العميل</th><th class="p-2">آخر 3 أرقام</th><th class="p-2">المبلغ</th><th class="p-2">العمولة</th></tr></thead>
+                                <thead class="sticky top-0 bg-slate-100 text-slate-600"><tr><th class="p-2">التاريخ والوقت</th><th class="p-2">النوع</th><th class="p-2">الخط</th><th class="p-2">العميل</th><th class="p-2" x-text="language === 'en' ? 'Last ' + branchExperienceSettings.customerNumberDigits + ' Digits' : 'آخر ' + branchExperienceSettings.customerNumberDigits + ' أرقام'"></th><th class="p-2">المبلغ</th><th class="p-2">العمولة</th></tr></thead>
                                 <tbody class="divide-y divide-slate-100">
                                     <template x-for="transaction in getClosingReportTransactions(selectedClosingReport)" :key="'closing-tx-' + transaction.id">
                                         <tr><td class="p-2 num-en" x-text="getRecordDisplayDateTime(transaction)"></td><td class="p-2" x-text="transaction.type === 'deposit' ? 'إيداع (داخل)' : 'سحب (خارج)'"></td><td class="p-2" x-text="getWalletName(transaction.walletId)"></td><td class="p-2" x-text="transaction.customerName || '-'"></td><td class="p-2 num-en" x-text="transaction.lastThree || '-'"></td><td class="p-2 num-en" x-text="formatMoney(transaction.amount) + ' ج'"></td><td class="p-2 num-en" x-text="formatMoney(transaction.fee) + ' ج'"></td></tr>
@@ -1515,7 +1748,7 @@
                 </div>
 
                 <!-- PAST CLOSINGS HISTORY TABLE -->
-                <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+                <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm xl:col-span-full">
                     <h4 class="font-extrabold text-slate-800 text-sm mb-3 flex items-center gap-2">
                         <i data-lucide="archive" class="w-4 h-4 text-slate-600"></i> أرشيف التقفيلات والشيفتات السابقة
                     </h4>
@@ -1653,15 +1886,15 @@
 
             <!-- TAB 3: VOUCHERS (سندات القبض والصرف) -->
             <template x-if="adminTab === 'vouchers'">
-            <div class="space-y-4">
-                
-                <div class="voucher-workspace bg-white rounded-2xl border border-slate-200 p-4 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div data-workflow-group="voucher" class="md:col-span-2 space-y-3">
-                        <h3 class="font-extrabold text-slate-800 text-base flex items-center gap-2 border-b border-slate-100 pb-2">
-                            <i data-lucide="file-plus" class="w-5 h-5 text-indigo-600"></i> إضافة سند قبض أو صرف جديد
+            <div class="grid grid-cols-1 items-stretch gap-4 xl:grid-cols-12">
+
+                    <div data-workflow-group="voucher" class="voucher-panel-enter flex flex-col overflow-visible rounded-2xl border border-indigo-100 bg-gradient-to-br from-white via-white to-indigo-50/50 p-4 shadow-md shadow-indigo-950/5 xl:col-span-6 xl:row-start-1">
+                        <h3 class="flex items-center gap-2 border-b border-indigo-100 pb-3 text-base font-extrabold text-slate-800">
+                            <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700"><i data-lucide="file-plus" class="h-5 w-5"></i></span>
+                            إضافة سند قبض أو صرف جديد
                         </h3>
 
-                        <div class="grid grid-cols-2 gap-3">
+                        <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <div>
                                 <label class="block text-xs font-bold text-slate-600 mb-1">نوع السند:</label>
                                 <select x-model="voucherForm.type" data-workflow-field required class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-xs font-bold">
@@ -1687,14 +1920,10 @@
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-2 gap-3">
+                        <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <div>
                                 <label class="block text-xs font-bold text-slate-600 mb-1">المبلغ (ج):</label>
                                 <input type="number" x-model.number="voucherForm.amount" placeholder="0.00" data-workflow-field class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-xs font-bold num-en">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-bold text-slate-600 mb-1">التاريخ والوقت:</label>
-                                <input type="datetime-local" x-model="voucherForm.datetime" data-workflow-field class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-xs font-bold num-en">
                             </div>
                             <div>
                                 <label class="block text-xs font-bold text-slate-600 mb-1">السبب / الملاحظة (إجباري):</label>
@@ -1702,43 +1931,39 @@
                             </div>
                         </div>
 
-                        <button @click="saveVoucher()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-5 py-2.5 rounded-xl text-xs flex items-center gap-1.5 transition">
-                            <i data-lucide="check" class="w-4 h-4"></i><span x-text="editingVoucherId ? 'حفظ تعديل السند' : 'حفظ السند واعتماده'"></span>
-                        </button>
-                        <button x-show="editingVoucherId" @click="cancelVoucherEdit()" class="bg-slate-100 text-slate-700 font-bold px-4 py-2 rounded-xl text-xs">إلغاء التعديل</button>
-                    </div>
-
-                    <!-- VOUCHER TOTALS -->
-                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col justify-between">
-                        <div>
-                            <h4 class="font-extrabold text-xs text-slate-600 mb-2">إجمالي حركة السندات المسجلة:</h4>
-                            <div class="space-y-2">
-                                <div class="flex justify-between items-center text-xs font-bold bg-emerald-100 text-emerald-800 p-2 rounded-lg">
-                                    <span>سندات القبض (الداخل):</span>
-                                    <span class="num-en text-sm" x-text="formatMoney(calculateVoucherTotals().receipts) + ' ج'"></span>
-                                </div>
-                                <div class="flex justify-between items-center text-xs font-bold bg-rose-100 text-rose-800 p-2 rounded-lg">
-                                    <span>سندات الصرف (الخارج):</span>
-                                    <span class="num-en text-sm" x-text="formatMoney(calculateVoucherTotals().payments) + ' ج'"></span>
-                                </div>
+                        <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div class="rounded-2xl border p-3 transition-colors" :class="!voucherForm.customerId ? 'border-slate-200 bg-slate-50' : (getVoucherBalancePreview()?.current > 0 ? 'border-rose-200 bg-rose-50/80' : (getVoucherBalancePreview()?.current < 0 ? 'border-emerald-200 bg-emerald-50/80' : 'border-slate-200 bg-slate-50'))">
+                                <span class="block text-[11px] font-bold text-slate-500">رصيد العميل قبل السند</span>
+                                <span class="mt-1 block text-base font-black num-en" :class="!voucherForm.customerId ? 'text-slate-400' : (getVoucherBalancePreview()?.current > 0 ? 'text-rose-700' : (getVoucherBalancePreview()?.current < 0 ? 'text-emerald-700' : 'text-slate-700'))" x-text="getVoucherBalancePreview() ? formatMoney(Math.abs(getVoucherBalancePreview().current)) + ' ج ' + (getVoucherBalancePreview().current > 0 ? 'عليه' : getVoucherBalancePreview().current < 0 ? 'له' : 'خالص') : 'اختر العميل لعرض رصيده'"></span>
+                            </div>
+                            <div class="rounded-2xl border p-3 transition-colors" :class="!voucherForm.customerId ? 'border-slate-200 bg-slate-50' : (getVoucherBalancePreview()?.projected > 0 ? 'border-rose-200 bg-rose-50/80' : (getVoucherBalancePreview()?.projected < 0 ? 'border-emerald-200 bg-emerald-50/80' : 'border-slate-200 bg-slate-50'))">
+                                <span class="block text-[11px] font-extrabold text-slate-600">الرصيد بعد السند</span>
+                                <span class="mt-1 block text-base font-black num-en" :class="!voucherForm.customerId ? 'text-slate-400' : (getVoucherBalancePreview()?.projected > 0 ? 'text-rose-700' : (getVoucherBalancePreview()?.projected < 0 ? 'text-emerald-700' : 'text-slate-700'))" x-text="getVoucherBalancePreview() ? formatMoney(Math.abs(getVoucherBalancePreview().projected)) + ' ج ' + (getVoucherBalancePreview().projected > 0 ? 'عليه' : getVoucherBalancePreview().projected < 0 ? 'له' : 'خالص') : 'سيظهر بعد اختيار العميل'"></span>
                             </div>
                         </div>
-                        <div class="voucher-customer-action-wrap">
-                            <button type="button" @click="openVoucherCustomerModal()" class="voucher-customer-action">
-                                <i data-lucide="user-plus" class="h-4 w-4"></i> إضافة عميل جديد
-                            </button>
+
+                        <div class="mt-4 grid grid-cols-1 items-end gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+                            <div>
+                                <label class="mb-1 block text-xs font-bold text-slate-600">التاريخ والوقت:</label>
+                                <input type="datetime-local" x-model="voucherForm.datetime" data-workflow-field class="w-full rounded-xl border border-slate-300 bg-white p-2.5 text-xs font-bold shadow-sm num-en">
+                            </div>
+                            <div class="flex flex-wrap gap-2 sm:justify-end">
+                                <button @click="saveVoucher()" class="flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm shadow-indigo-200 transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                                    <i data-lucide="check" class="h-4 w-4"></i><span x-text="editingVoucherId ? 'حفظ تعديل السند' : 'حفظ السند واعتماده'"></span>
+                                </button>
+                                <button x-show="editingVoucherId" @click="cancelVoucherEdit()" class="rounded-xl bg-slate-100 px-4 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-200">إلغاء التعديل</button>
+                            </div>
                         </div>
                     </div>
-                </div>
 
                 <!-- VOUCHERS LIST TABLE -->
-                <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-                    <div class="flex justify-between items-center mb-3">
+                <div class="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm xl:col-span-12 xl:row-start-2 voucher-panel-enter [animation-delay:120ms]">
+                    <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
                         <h4 class="font-extrabold text-slate-800 text-sm">سجل السندات المسجلة</h4>
-                        <input type="text" x-model="voucherSearch" placeholder="بحث بالسند أو العميل..." class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold w-64">
+                        <input type="text" x-model="voucherSearch" placeholder="بحث بالسند أو العميل..." class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold sm:w-64">
                     </div>
-                    <div class="overflow-x-auto max-h-64">
-                        <table class="w-full text-right text-xs">
+                    <div class="max-h-[calc(100vh-13rem)] overflow-auto rounded-xl border border-slate-100">
+                        <table class="w-full min-w-[760px] text-right text-xs">
                             <thead class="bg-slate-100 text-slate-600 font-bold sticky top-0">
                                 <tr>
                                     <th class="p-2.5">التاريخ والوقت</th>
@@ -1775,6 +2000,106 @@
                             </tbody>
                         </table>
                     </div>
+
+                </div>
+
+                <div class="voucher-panel-enter flex h-full min-h-[420px] flex-col overflow-visible rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50/80 via-white to-slate-50 p-4 shadow-sm xl:col-span-6 xl:col-start-7 xl:row-start-1 [animation-delay:60ms]">
+                        <div class="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-[auto_minmax(0,1fr)]">
+                            <button type="button" @click="openVoucherCustomerModal()" class="flex min-h-16 items-center justify-center gap-2 rounded-2xl border border-indigo-200 bg-white px-5 py-3 text-sm font-extrabold text-indigo-800 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-indigo-300 hover:bg-indigo-50 hover:shadow-md">
+                                <i data-lucide="user-plus" class="h-5 w-5"></i> إضافة عميل جديد
+                            </button>
+                            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                <div class="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-3 shadow-sm">
+                                    <span class="block text-xs font-extrabold text-emerald-800">سندات القبض · الداخل</span>
+                                    <span class="mt-1 block text-lg font-black text-emerald-700 num-en" x-text="formatMoney(calculateVoucherTotals().receipts) + ' ج'"></span>
+                                </div>
+                                <div class="rounded-2xl border border-rose-200 bg-gradient-to-br from-rose-50 to-white p-3 shadow-sm">
+                                    <span class="block text-xs font-extrabold text-rose-800">سندات الصرف · الخارج</span>
+                                    <span class="mt-1 block text-lg font-black text-rose-700 num-en" x-text="formatMoney(calculateVoucherTotals().payments) + ' ج'"></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-4 flex items-center gap-3 border-b border-indigo-100 pb-3">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700"><i data-lucide="file-search-2" class="h-5 w-5"></i></span>
+                            <div>
+                                <h5 class="text-sm font-extrabold text-slate-800">تقرير السندات</h5>
+                                <p class="text-[11px] font-semibold text-slate-500">اختر نطاق التقرير لعرض السندات وإجمالياتها</p>
+                            </div>
+                        </div>
+                        <div class="grid flex-1 content-between grid-cols-1 items-end gap-4 sm:grid-cols-2">
+                            <div>
+                                <label class="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-slate-600"><i data-lucide="filter" class="h-4 w-4 text-indigo-500"></i> نطاق التقرير</label>
+                                <select x-model="voucherReportFilter.mode" class="w-full rounded-xl border border-slate-200 bg-white p-3 text-xs font-bold text-slate-700 shadow-sm transition focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100">
+                                    <option value="today">سندات اليوم</option>
+                                    <option value="period">فترة زمنية محددة</option>
+                                </select>
+                            </div>
+                            <div class="relative">
+                                <label class="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-slate-600"><i data-lucide="search" class="h-4 w-4 text-indigo-500"></i> ابحث عن العميل</label>
+                                <div @click.outside="voucherReportCustomerDropdownOpen = false">
+                                    <input type="search" :value="voucherReportCustomerSearch" @focus="voucherReportCustomerDropdownOpen = true" @input="voucherReportCustomerSearch = $event.target.value; voucherReportFilter.customerId = ''; voucherReportCustomerDropdownOpen = true" placeholder="الاسم أو رقم الهاتف..." autocomplete="off" class="w-full rounded-xl border border-slate-200 bg-white p-3 text-xs font-bold text-slate-700 shadow-sm transition focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100">
+                                    <div x-show="voucherReportCustomerDropdownOpen" x-cloak class="absolute inset-x-0 top-full z-30 mt-1 max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl">
+                                        <template x-for="customer in getFilteredVoucherReportCustomers()" :key="'voucher-report-customer-' + customer.id">
+                                            <button type="button" @click="selectVoucherReportCustomer(customer)" class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-right text-xs font-bold text-slate-800 hover:bg-indigo-50">
+                                                <span x-text="customer.name"></span>
+                                                <span class="text-slate-500 num-en" x-text="customer.phone || 'بدون رقم هاتف'"></span>
+                                            </button>
+                                        </template>
+                                        <p x-show="getFilteredVoucherReportCustomers().length === 0" class="p-3 text-center text-xs font-bold text-slate-400">لا يوجد عميل بهذا الاسم أو الرقم.</p>
+                                    </div>
+                                </div>
+                                <button type="button" @click="clearVoucherReportCustomer()" class="mt-1.5 text-[11px] font-bold text-indigo-700 transition hover:text-indigo-900">عرض كل العملاء</button>
+                            </div>
+                            <div>
+                                <label class="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-slate-600"><i data-lucide="calendar" class="h-4 w-4 text-indigo-500"></i> من تاريخ</label>
+                                <input type="date" x-model="voucherReportFilter.fromDate" @change="voucherReportFilter.mode = 'period'" class="w-full rounded-xl border border-slate-200 bg-white p-3 text-xs font-bold text-slate-700 shadow-sm">
+                            </div>
+                            <div>
+                                <label class="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-slate-600"><i data-lucide="calendar-check" class="h-4 w-4 text-indigo-500"></i> إلى تاريخ</label>
+                                <input type="date" x-model="voucherReportFilter.toDate" @change="voucherReportFilter.mode = 'period'" class="w-full rounded-xl border border-slate-200 bg-white p-3 text-xs font-bold text-slate-700 shadow-sm">
+                            </div>
+                            <button type="button" @click="openVoucherReport()" class="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-xs font-extrabold text-white shadow-sm shadow-indigo-200 transition duration-200 hover:-translate-y-0.5 hover:bg-indigo-700 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-300 sm:col-span-2">
+                                <i data-lucide="file-bar-chart-2" class="h-4 w-4 shrink-0"></i> عرض تقرير السندات
+                            </button>
+                        </div>
+                        <div x-show="voucherReportFilter.customerId" x-cloak class="mt-3 flex items-center gap-1.5 rounded-xl border border-indigo-100 bg-white/80 p-2.5 text-[11px] font-bold text-indigo-700"><i data-lucide="user-check" class="h-4 w-4 shrink-0"></i><span x-text="'العميل المحدد: ' + (customers.find(item => item.id === voucherReportFilter.customerId)?.name || '')"></span></div>
+                </div>
+                <div x-show="showVoucherReportModal" x-cloak @click.self="showVoucherReportModal = false" @keydown.escape.window="showVoucherReportModal = false" class="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/70 p-3 sm:p-6">
+                    <section class="max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-2xl border border-indigo-100 bg-white p-4 shadow-2xl sm:p-6">
+                        <div class="sticky top-0 z-10 mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-white pb-3">
+                            <div>
+                                <h4 class="flex items-center gap-2 text-base font-extrabold text-slate-900"><i data-lucide="file-bar-chart-2" class="h-5 w-5 text-indigo-600"></i> تقرير سندات القبض والصرف</h4>
+                                <p class="mt-1 text-xs font-semibold text-slate-500" x-text="(voucherReportFilter.mode === 'today' ? 'سندات اليوم' : 'من ' + voucherReportFilter.fromDate + ' إلى ' + voucherReportFilter.toDate) + (voucherReportFilter.customerId ? ' · العميل: ' + (customers.find(item => item.id === voucherReportFilter.customerId)?.name || '') : ' · كل العملاء')"></p>
+                            </div>
+                            <button type="button" @click="showVoucherReportModal = false" class="rounded-xl bg-slate-100 px-4 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-200">إغلاق التقرير</button>
+                        </div>
+
+                        <div class="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                            <div class="rounded-xl border border-slate-200 bg-slate-50 p-3"><span class="block text-[11px] font-bold text-slate-500">عدد السندات</span><strong class="mt-1 block text-lg font-black text-slate-800 num-en" x-text="voucherReportTotals.count"></strong></div>
+                            <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-3"><span class="block text-[11px] font-bold text-emerald-700">إجمالي القبض · الداخل</span><strong class="mt-1 block text-lg font-black text-emerald-800 num-en" x-text="formatMoney(voucherReportTotals.receipts) + ' ج'"></strong></div>
+                            <div class="rounded-xl border border-rose-200 bg-rose-50 p-3"><span class="block text-[11px] font-bold text-rose-700">إجمالي الصرف · الخارج</span><strong class="mt-1 block text-lg font-black text-rose-800 num-en" x-text="formatMoney(voucherReportTotals.payments) + ' ج'"></strong></div>
+                        </div>
+
+                        <div class="overflow-x-auto rounded-xl border border-slate-200">
+                            <table class="w-full min-w-[680px] text-right text-xs">
+                                <thead class="bg-slate-100 text-slate-600">
+                                    <tr><th class="p-3">التاريخ والوقت</th><th class="p-3">النوع</th><th class="p-3">العميل</th><th class="p-3">المبلغ</th><th class="p-3">السبب / الملاحظة</th></tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    <template x-for="voucher in voucherReportRows" :key="'voucher-report-' + voucher.id">
+                                        <tr class="font-bold hover:bg-slate-50">
+                                            <td class="whitespace-nowrap p-3 text-slate-500 num-en" x-text="getRecordDisplayDateTime(voucher)"></td>
+                                            <td class="p-3"><span class="rounded-full px-2 py-1 text-[10px]" :class="voucher.type === 'receipt' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'" x-text="voucher.type === 'receipt' ? 'قبض · داخل' : 'صرف · خارج'"></span></td>
+                                            <td class="p-3 text-slate-800" x-text="getCustomerName(voucher.customerId)"></td>
+                                            <td class="p-3 font-black num-en" :class="voucher.type === 'receipt' ? 'text-emerald-700' : 'text-rose-700'" x-text="formatMoney(voucher.amount) + ' ج'"></td>
+                                            <td class="p-3 text-slate-600" x-text="voucher.notes || '—'"></td>
+                                        </tr>
+                                    </template>
+                                    <tr x-show="voucherReportRows.length === 0"><td colspan="5" class="p-8 text-center font-bold text-slate-400">لا توجد سندات في النطاق المحدد.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
                 </div>
 
             </div>
@@ -1793,15 +2118,34 @@
                     </button>
                 </div>
 
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <div class="rounded-2xl border border-rose-200 bg-gradient-to-br from-rose-50 to-white p-3 shadow-sm">
+                        <span class="flex items-center gap-2 text-xs font-extrabold text-rose-700"><i data-lucide="users-round" class="h-4 w-4"></i> العملاء المدينون</span>
+                        <div class="mt-2 flex items-end justify-between gap-2"><strong class="text-xl font-black text-rose-800 num-en" x-text="customerDebtSummary.debtorsCount"></strong><span class="text-sm font-extrabold text-rose-700 num-en" x-text="formatMoney(customerDebtSummary.debtorsTotal) + ' ج'"></span></div>
+                    </div>
+                    <div class="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-3 shadow-sm">
+                        <span class="flex items-center gap-2 text-xs font-extrabold text-emerald-700"><i data-lucide="wallet" class="h-4 w-4"></i> إجمالي المبالغ المستحقة للعملاء</span>
+                        <div class="mt-2 flex items-end justify-between gap-2"><strong class="text-xl font-black text-emerald-800 num-en" x-text="customerDebtSummary.creditorsCount"></strong><span class="text-sm font-extrabold text-emerald-700 num-en" x-text="formatMoney(customerDebtSummary.creditorsTotal) + ' ج'"></span></div>
+                    </div>
+                    <div class="rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white p-3 shadow-sm sm:col-span-2">
+                        <span class="flex items-center gap-2 text-xs font-extrabold text-blue-700"><i data-lucide="scale" class="h-4 w-4"></i> صافي حسابات العملاء</span>
+                        <div class="mt-2 flex items-end justify-between gap-2"><span class="text-[11px] font-semibold text-slate-500">المديونيات مطروحًا منها المبالغ المستحقة للعملاء</span><strong class="text-lg font-black num-en" :class="customerDebtSummary.debtorsTotal - customerDebtSummary.creditorsTotal > 0 ? 'text-rose-700' : (customerDebtSummary.debtorsTotal - customerDebtSummary.creditorsTotal < 0 ? 'text-emerald-700' : 'text-slate-700')" x-text="formatMoney(customerDebtSummary.debtorsTotal - customerDebtSummary.creditorsTotal) + ' ج'"></strong></div>
+                    </div>
+                </div>
+
                 <!-- TWO COLUMN SPLIT TABLE (DEBTORS / CREDITORS) -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
                     
                     <!-- RIGHT COLUMN: DEBTORS (ناس عليها فلوس - أحمر) -->
-                    <div class="bg-white rounded-2xl border-2 border-rose-500/30 p-4 shadow-sm">
+                    <div class="flex h-full flex-col rounded-2xl border-2 border-rose-500/30 bg-white p-4 shadow-sm">
                         <h4 class="font-black text-rose-700 text-sm mb-3 flex items-center gap-2 border-b border-rose-100 pb-2">
                             <i data-lucide="arrow-down-right" class="w-4 h-4"></i> ناس عليها فلوس (عملاء مدينون)
                         </h4>
-                        <div class="overflow-x-auto max-h-72">
+                        <label class="relative mb-3 block">
+                            <i data-lucide="search" class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-rose-400"></i>
+                            <input type="search" x-model="debtorSearch" placeholder="ابحث باسم العميل أو رقم الهاتف..." class="w-full rounded-xl border border-rose-100 bg-rose-50/50 py-2.5 pr-9 pl-3 text-xs font-bold text-slate-700 outline-none transition focus:border-rose-300 focus:bg-white focus:ring-2 focus:ring-rose-100">
+                        </label>
+                        <div class="flex-1 overflow-x-auto rounded-xl border border-rose-100">
                             <table class="w-full text-right text-xs">
                                 <thead class="bg-rose-50 text-rose-800 font-bold">
                                     <tr>
@@ -1812,7 +2156,7 @@
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-rose-50">
-                                    <template x-for="c in debtorsList" :key="c.id">
+                                    <template x-for="c in filteredDebtors" :key="c.id">
                                         <tr class="hover:bg-rose-50/50 font-bold">
                                             <td class="p-2 text-slate-900" x-text="c.name"></td>
                                             <td class="p-2 text-slate-500 num-en" x-text="c.phone"></td>
@@ -1826,17 +2170,25 @@
                                             </td>
                                         </tr>
                                     </template>
+                                    <tr x-show="filteredDebtors.length === 0"><td colspan="4" class="p-5 text-center font-bold text-slate-400">لا توجد نتائج مطابقة.</td></tr>
                                 </tbody>
+                                <tfoot class="border-t-2 border-rose-100 bg-rose-50/70 font-extrabold text-rose-800">
+                                    <tr><td colspan="2" class="p-2.5">إجمالي الظاهر (<span x-text="filteredDebtors.length"></span>)</td><td class="p-2.5 num-en" x-text="formatMoney(filteredDebtorsTotal) + ' ج'"></td><td></td></tr>
+                                </tfoot>
                             </table>
                         </div>
                     </div>
 
                     <!-- LEFT COLUMN: CREDITORS (ناس ليها فلوس - أخضر) -->
-                    <div class="bg-white rounded-2xl border-2 border-emerald-500/30 p-4 shadow-sm">
+                    <div class="flex h-full flex-col rounded-2xl border-2 border-emerald-500/30 bg-white p-4 shadow-sm">
                         <h4 class="font-black text-emerald-700 text-sm mb-3 flex items-center gap-2 border-b border-emerald-100 pb-2">
                             <i data-lucide="arrow-up-left" class="w-4 h-4"></i> ناس ليها فلوس (عملاء دائنون)
                         </h4>
-                        <div class="overflow-x-auto max-h-72">
+                        <label class="relative mb-3 block">
+                            <i data-lucide="search" class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-emerald-500"></i>
+                            <input type="search" x-model="creditorSearch" placeholder="ابحث باسم العميل أو رقم الهاتف..." class="w-full rounded-xl border border-emerald-100 bg-emerald-50/50 py-2.5 pr-9 pl-3 text-xs font-bold text-slate-700 outline-none transition focus:border-emerald-300 focus:bg-white focus:ring-2 focus:ring-emerald-100">
+                        </label>
+                        <div class="flex-1 overflow-x-auto rounded-xl border border-emerald-100">
                             <table class="w-full text-right text-xs">
                                 <thead class="bg-emerald-50 text-emerald-800 font-bold">
                                     <tr>
@@ -1847,7 +2199,7 @@
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-emerald-50">
-                                    <template x-for="c in creditorsList" :key="c.id">
+                                    <template x-for="c in filteredCreditors" :key="c.id">
                                         <tr class="hover:bg-emerald-50/50 font-bold">
                                             <td class="p-2 text-slate-900" x-text="c.name"></td>
                                             <td class="p-2 text-slate-500 num-en" x-text="c.phone"></td>
@@ -1861,7 +2213,11 @@
                                             </td>
                                         </tr>
                                     </template>
+                                    <tr x-show="filteredCreditors.length === 0"><td colspan="4" class="p-5 text-center font-bold text-slate-400">لا توجد نتائج مطابقة.</td></tr>
                                 </tbody>
+                                <tfoot class="border-t-2 border-emerald-100 bg-emerald-50/70 font-extrabold text-emerald-800">
+                                    <tr><td colspan="2" class="p-2.5">إجمالي الظاهر (<span x-text="filteredCreditors.length"></span>)</td><td class="p-2.5 num-en" x-text="formatMoney(filteredCreditorsTotal) + ' ج'"></td><td></td></tr>
+                                </tfoot>
                             </table>
                         </div>
                     </div>
@@ -1968,8 +2324,8 @@
                         <label class="text-xs font-bold text-slate-600">إلى تاريخ
                             <input type="date" x-model="walletReportFilter.toDate" class="mt-1 w-full bg-white border border-slate-300 rounded-xl p-2 text-xs">
                         </label>
-                        <label class="text-xs font-bold text-slate-600">آخر 3 أرقام للعميل
-                            <input type="text" inputmode="numeric" maxlength="3" x-model="walletReportFilter.lastThree" placeholder="مثال: 123" class="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2 text-xs num-en">
+                        <label class="text-xs font-bold text-slate-600"><span x-text="language === 'en' ? 'Customer last ' + branchExperienceSettings.customerNumberDigits + ' digits' : 'آخر ' + branchExperienceSettings.customerNumberDigits + ' أرقام للعميل'"></span>
+                            <input type="text" inputmode="numeric" :maxlength="branchExperienceSettings.customerNumberDigits" x-model="walletReportFilter.lastThree" @input="$event.target.value = normalizeCustomerNumberDigits($event.target.value); walletReportFilter.lastThree = $event.target.value" :placeholder="language === 'en' ? 'Example: 1234' : 'مثال: 1234'" class="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2 text-xs num-en">
                         </label>
                         <button @click="generateWalletReport()" class="self-end bg-blue-600 hover:bg-blue-700 text-white font-bold p-2 rounded-xl text-xs flex items-center justify-center gap-1">
                             <i data-lucide="search" class="w-4 h-4"></i> عرض التقرير
@@ -1984,7 +2340,7 @@
                     </div>
                     <div class="overflow-x-auto max-h-96">
                         <table class="w-full text-right text-xs">
-                            <thead class="bg-slate-100 text-slate-600 font-bold sticky top-0"><tr><th class="p-2">التاريخ والوقت</th><th class="p-2">النوع</th><th class="p-2">العميل</th><th class="p-2">آخر أرقام</th><th class="p-2">المبلغ</th><th class="p-2">العمولة</th><th class="p-2">إجراءات</th></tr></thead>
+                            <thead class="bg-slate-100 text-slate-600 font-bold sticky top-0"><tr><th class="p-2">التاريخ والوقت</th><th class="p-2">النوع</th><th class="p-2">العميل</th><th class="p-2" x-text="language === 'en' ? 'Last ' + branchExperienceSettings.customerNumberDigits + ' Digits' : 'آخر ' + branchExperienceSettings.customerNumberDigits + ' أرقام'"></th><th class="p-2">المبلغ</th><th class="p-2">العمولة</th><th class="p-2">إجراءات</th></tr></thead>
                             <tbody class="divide-y divide-slate-100">
                                 <template x-for="t in walletReportTransactions" :key="t.id"><tr class="font-bold"><td class="p-2 num-en" x-text="getRecordDisplayDateTime(t)"></td><td class="p-2" x-text="t.type === 'deposit' ? 'إيداع للعميل' : 'سحب من العميل'"></td><td class="p-2" x-text="t.customerName || '-' "></td><td class="p-2 num-en" x-text="t.lastThree || '-' "></td><td class="p-2 num-en" x-text="formatMoney(t.amount) + ' ج'"></td><td class="p-2 text-amber-700 num-en" x-text="formatMoney(t.fee) + ' ج'"></td><td class="p-2 text-center"><button @click="editTransaction(t)" class="text-blue-600" title="تعديل"><i data-lucide="edit" class="w-4 h-4"></i></button><button @click="deleteTransaction(t.id)" class="text-rose-600" title="حذف"><i data-lucide="trash-2" class="w-4 h-4"></i></button></td></tr></template>
                                 <tr x-show="walletReportTransactions.length === 0"><td colspan="7" class="p-5 text-center text-slate-400">لا توجد عمليات لهذا الخط في الفترة المحددة</td></tr>
@@ -2096,8 +2452,8 @@
                 <label class="text-xs font-bold text-slate-600">اسم العميل
                     <input type="text" x-model="transactionForm.customerName" data-workflow-field class="mt-1 w-full bg-slate-50 border border-slate-300 rounded-lg p-2">
                 </label>
-                <label class="text-xs font-bold text-slate-600">آخر 3 أرقام
-                    <input type="text" inputmode="numeric" maxlength="3" x-model="transactionForm.lastThree" data-workflow-field data-workflow-action="transaction-edit" class="mt-1 w-full bg-slate-50 border border-slate-300 rounded-lg p-2 num-en">
+                <label class="text-xs font-bold text-slate-600"><span x-text="language === 'en' ? 'Last ' + branchExperienceSettings.customerNumberDigits + ' digits' : 'آخر ' + branchExperienceSettings.customerNumberDigits + ' أرقام'"></span>
+                    <input type="text" inputmode="numeric" :maxlength="branchExperienceSettings.customerNumberDigits" x-model="transactionForm.lastThree" @input="$event.target.value = normalizeCustomerNumberDigits($event.target.value); transactionForm.lastThree = $event.target.value" data-workflow-field data-workflow-action="transaction-edit" class="mt-1 w-full bg-slate-50 border border-slate-300 rounded-lg p-2 num-en">
                 </label>
             </div>
             <div class="flex justify-end gap-2">
@@ -2198,48 +2554,130 @@
 
     <!-- MODAL 4: CUSTOMER STATEMENT AUDIT MODAL -->
     <div x-show="showStatementModal" x-cloak class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div @click.away="showStatementModal = false" class="bg-white rounded-2xl max-w-2xl w-full p-5 space-y-4 shadow-2xl border border-slate-100 max-h-[85vh] overflow-y-auto">
-            <div class="flex justify-between items-center border-b border-slate-100 pb-2">
+        <div @click.away="showStatementModal = false" class="bg-white rounded-2xl max-w-5xl w-full p-5 space-y-4 shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto">
+            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-3">
                 <div>
-                    <h3 class="font-black text-slate-900 text-base" x-text="'كشف حساب العميل: ' + selectedCustomer.name"></h3>
-                    <p class="text-xs text-slate-500 font-bold num-en" x-text="'رقم الهاتف: ' + (selectedCustomer.phone || '—')"></p>
+                    <h3 class="font-black text-slate-900 text-lg" x-text="'كشف حساب العميل: ' + toLatinDigits(selectedCustomer.name)"></h3>
+                    <p class="text-xs text-slate-500 font-bold num-en" x-text="'رقم الهاتف: ' + (toLatinDigits(selectedCustomer.phone) || '—')"></p>
                 </div>
-                <div class="text-left">
-                    <span class="text-xs text-slate-500 font-bold block">رصيد الحساب الحرج:</span>
-                    <span class="text-lg font-black num-en" :class="selectedCustomer.balance > 0 ? 'text-rose-600' : 'text-emerald-600'" x-text="formatMoney(Math.abs(selectedCustomer.balance || 0)) + ' ج (' + (selectedCustomer.balance > 0 ? 'عليه فلوس' : 'له فلوس') + ')'"></span>
+                <div class="flex flex-wrap gap-2">
+                    <button @click="printCustomerStatement()" class="inline-flex items-center gap-1.5 rounded-xl bg-blue-700 px-3 py-2 text-xs font-extrabold text-white hover:bg-blue-800">
+                        <i data-lucide="printer" class="h-4 w-4"></i> طباعة الكشف
+                    </button>
+                    <button @click="showStatementModal = false" class="rounded-xl bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700">إغلاق</button>
                 </div>
             </div>
 
-            <!-- STATEMENT TRANSACTIONS TABLE -->
-            <div class="overflow-x-auto">
-                <table class="w-full text-right text-xs">
-                    <thead class="bg-slate-100 text-slate-600 font-bold">
+            <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <span class="block text-[11px] font-bold text-slate-500">الرصيد الحالي</span>
+                    <strong class="mt-1 block text-sm font-black num-en" :class="selectedCustomer.balance > 0 ? 'text-rose-700' : (selectedCustomer.balance < 0 ? 'text-emerald-700' : 'text-slate-700')" x-text="formatMoney(Math.abs(selectedCustomer.balance || 0)) + ' EGP · ' + (selectedCustomer.balance > 0 ? 'عليه لنا' : (selectedCustomer.balance < 0 ? 'له لدينا' : 'متوازن'))"></strong>
+                </div>
+                <div class="rounded-xl border border-rose-100 bg-rose-50 p-3">
+                    <span class="block text-[11px] font-bold text-rose-700">إجمالي سندات الصرف</span>
+                    <strong data-preserve-latin class="mt-1 block text-sm font-black text-rose-800 num-en" x-text="formatMoney(customerStatementTotals.payments) + ' EGP'"></strong>
+                </div>
+                <div class="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
+                    <span class="block text-[11px] font-bold text-emerald-700">إجمالي سندات القبض</span>
+                    <strong data-preserve-latin class="mt-1 block text-sm font-black text-emerald-800 num-en" x-text="formatMoney(customerStatementTotals.receipts) + ' EGP'"></strong>
+                </div>
+                <div class="rounded-xl border border-blue-100 bg-blue-50 p-3">
+                    <span class="block text-[11px] font-bold text-blue-700">عدد الحركات المعروضة</span>
+                    <strong class="mt-1 block text-sm font-black text-blue-800 num-en" x-text="customerStatementTotals.count"></strong>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(12rem,1fr)_repeat(2,minmax(9rem,auto))_auto]">
+                <input x-model.trim="customerStatementFilter.search" type="search" aria-label="بحث في كشف الحساب" placeholder="ابحث في البيان أو نوع السند..." class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold">
+                <label class="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-[11px] font-bold text-slate-600">
+                    <span class="shrink-0">من</span>
+                    <input x-model="customerStatementFilter.fromDate" type="date" lang="en" dir="ltr" aria-label="من تاريخ" class="min-w-0 w-full bg-transparent text-xs font-bold num-en">
+                </label>
+                <label class="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-[11px] font-bold text-slate-600">
+                    <span class="shrink-0">إلى</span>
+                    <input x-model="customerStatementFilter.toDate" type="date" lang="en" dir="ltr" aria-label="إلى تاريخ" class="min-w-0 w-full bg-transparent text-xs font-bold num-en">
+                </label>
+                <button @click="customerStatementFilter = { search: '', fromDate: '', toDate: '' }" class="rounded-xl bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700">مسح الفلاتر</button>
+            </div>
+
+            <div class="overflow-x-auto rounded-xl border border-slate-200">
+                <table class="w-full min-w-[760px] text-right text-xs">
+                    <thead class="sticky top-0 bg-slate-100 text-slate-600 font-bold">
                         <tr>
-                            <th class="p-2">التاريخ والوقت</th>
-                            <th class="p-2">نوع الحركة</th>
-                            <th class="p-2">المبلغ</th>
-                            <th class="p-2">السبب / البيان</th>
+                            <th class="p-2.5">التاريخ والوقت</th>
+                            <th class="p-2.5">نوع الحركة</th>
+                            <th class="p-2.5">المبلغ</th>
+                            <th class="p-2.5">الرصيد بعد الحركة</th>
+                            <th class="p-2.5">السبب / البيان</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
-                        <template x-for="v in selectedCustomerVouchers" :key="v.id">
+                        <tr class="bg-blue-50/70 font-extrabold">
+                            <td class="p-2.5 text-slate-500">—</td>
+                            <td class="p-2.5 text-blue-800" x-text="customerStatementFilter.fromDate ? 'الرصيد قبل الفترة' : 'الرصيد الافتتاحي'"></td>
+                            <td class="p-2.5 text-slate-500">—</td>
+                            <td data-preserve-latin class="p-2.5 num-en" :class="customerStatementStartBalance > 0 ? 'text-rose-700' : 'text-emerald-700'" x-text="formatMoney(Math.abs(customerStatementStartBalance)) + ' EGP'"></td>
+                            <td class="p-2.5 text-slate-500">قبل الحركات المعروضة</td>
+                        </tr>
+                        <template x-for="row in customerStatementRows" :key="row.voucher.id">
                             <tr class="hover:bg-slate-50 font-bold">
-                                <td class="p-2 text-slate-500 num-en" x-text="getRecordDisplayDateTime(v)"></td>
-                                <td class="p-2">
-                                    <span :class="v.type === 'payment' ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'" class="px-2 py-0.5 rounded text-[10px]" x-text="v.type === 'payment' ? 'سند صرف (+دين)' : 'سند قبض (-دين)'"></span>
+                                <td class="p-2.5 text-slate-500 num-en" x-text="getCustomerStatementDisplayDateTime(row.voucher)"></td>
+                                <td class="p-2.5">
+                                    <span :class="row.voucher.type === 'payment' ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'" class="whitespace-nowrap rounded px-2 py-1 text-[10px]" x-text="row.voucher.type === 'payment' ? 'سند صرف (+دين)' : 'سند قبض (-دين)'"></span>
                                 </td>
-                                <td class="p-2 font-black num-en" x-text="formatMoney(v.amount) + ' ج'"></td>
-                                <td class="p-2 text-slate-600" x-text="v.notes"></td>
+                                <td data-preserve-latin class="p-2.5 font-black num-en" x-text="formatMoney(row.voucher.amount) + ' EGP'"></td>
+                                <td data-preserve-latin class="p-2.5 font-black num-en" :class="row.balanceAfter > 0 ? 'text-rose-700' : (row.balanceAfter < 0 ? 'text-emerald-700' : 'text-slate-700')" x-text="formatMoney(Math.abs(row.balanceAfter)) + ' EGP'"></td>
+                                <td class="p-2.5 text-slate-600" x-text="toLatinDigits(row.voucher.notes || '—')"></td>
                             </tr>
                         </template>
+                        <tr x-show="customerStatementRows.length === 0" x-cloak>
+                            <td colspan="5" class="p-8 text-center font-bold text-slate-500">لا توجد حركات مطابقة للفلاتر المحددة.</td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
-
-            <div class="flex justify-end pt-2">
-                <button @click="showStatementModal = false" class="bg-slate-100 text-slate-700 font-bold px-4 py-2 rounded-xl text-xs">إغلاق</button>
-            </div>
         </div>
+    </div>
+
+    <div id="customerStatementPrintArea" class="hidden print-only p-5 text-black">
+        <header class="mb-4 border-b-2 border-slate-800 pb-3 text-center">
+            <h1 class="text-xl font-black" x-text="currentBranch?.name || 'Sama Phone'"></h1>
+            <h2 class="mt-1 text-base font-extrabold" x-text="'كشف حساب العميل: ' + toLatinDigits(selectedCustomer.name)"></h2>
+            <p class="mt-1 text-xs" x-text="'رقم الهاتف: ' + (toLatinDigits(selectedCustomer.phone) || '—')"></p>
+        </header>
+        <div class="mb-3 flex justify-between text-xs font-bold">
+            <span>الرصيد الحالي: <b class="num-en" x-text="formatMoney(Math.abs(selectedCustomer.balance || 0)) + ' EGP · ' + (selectedCustomer.balance > 0 ? 'عليه لنا' : (selectedCustomer.balance < 0 ? 'له لدينا' : 'متوازن'))"></b></span>
+            <span class="num-en" x-text="'تاريخ الطباعة: ' + formatCustomerStatementDateTime(new Date())"></span>
+        </div>
+        <table class="w-full border-collapse text-right text-[10px]">
+            <thead>
+                <tr class="bg-slate-100">
+                    <th class="border border-slate-400 p-2">التاريخ والوقت</th>
+                    <th class="border border-slate-400 p-2">نوع الحركة</th>
+                    <th class="border border-slate-400 p-2">المبلغ</th>
+                    <th class="border border-slate-400 p-2">الرصيد بعد الحركة</th>
+                    <th class="border border-slate-400 p-2">البيان</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="border border-slate-400 p-2">—</td>
+                    <td class="border border-slate-400 p-2" x-text="customerStatementFilter.fromDate ? 'الرصيد قبل الفترة' : 'الرصيد الافتتاحي'"></td>
+                    <td class="border border-slate-400 p-2">—</td>
+                    <td data-preserve-latin class="border border-slate-400 p-2 num-en" x-text="formatMoney(Math.abs(customerStatementStartBalance)) + ' EGP'"></td>
+                    <td class="border border-slate-400 p-2">قبل الحركات المعروضة</td>
+                </tr>
+                <template x-for="row in customerStatementRows" :key="'print-' + row.voucher.id">
+                    <tr>
+                        <td class="border border-slate-400 p-2 num-en" x-text="getCustomerStatementDisplayDateTime(row.voucher)"></td>
+                        <td class="border border-slate-400 p-2" x-text="row.voucher.type === 'payment' ? 'سند صرف (+دين)' : 'سند قبض (-دين)'"></td>
+                        <td data-preserve-latin class="border border-slate-400 p-2 num-en" x-text="formatMoney(row.voucher.amount) + ' EGP'"></td>
+                        <td data-preserve-latin class="border border-slate-400 p-2 num-en" x-text="formatMoney(Math.abs(row.balanceAfter)) + ' EGP'"></td>
+                        <td class="border border-slate-400 p-2" x-text="toLatinDigits(row.voucher.notes || '—')"></td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
     </div>
 
     <!-- PRINT RECEIPT TEMPLATE (VISIBLE ONLY WHEN PRINTING) -->
@@ -2253,7 +2691,7 @@
             <p>نوع العملية: <span x-text="receiptData.type === 'deposit' ? 'إيداع (كاش)' : 'سحب (كاش)'"></span></p>
             <p>المحفظة/الخط: <span x-text="getWalletName(receiptData.walletId)"></span></p>
             <p>اسم العميل: <span x-text="receiptData.customerName || 'عميل نقدي'"></span></p>
-            <p>آخر 3 أرقام: <span x-text="receiptData.lastThree || 'غير محدد'"></span></p>
+            <p><span x-text="language === 'en' ? 'Last ' + branchExperienceSettings.customerNumberDigits + ' digits:' : 'آخر ' + branchExperienceSettings.customerNumberDigits + ' أرقام:'"></span> <span x-text="receiptData.lastThree || (language === 'en' ? 'Not specified' : 'غير محدد')"></span></p>
             <p class="font-bold text-sm pt-1">المبلغ: <span x-text="formatMoney(receiptData.amount || 0)"></span> ج</p>
             <p>العمولة: <span x-text="formatMoney(receiptData.fee || 0)"></span> ج</p>
         </div>

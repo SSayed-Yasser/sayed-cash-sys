@@ -1522,6 +1522,12 @@ html.dark-mode .global-announcement.severity-urgent { border-color: #7f1d3d; bac
     color: var(--performance-ink, #334155);
     box-shadow: 0 5px 16px color-mix(in srgb, var(--performance-color, #64748b) 10%, transparent);
 }
+.branch-rank-dropdown.cashier-header-card {
+    width: 100%;
+    margin: 0;
+    border-top: 1px solid var(--performance-color, #cbd5e1);
+    border-radius: .9rem;
+}
 .branch-rank-dropdown summary {
     display: flex;
     min-height: 2.1rem;
@@ -2921,4 +2927,20 @@ html.dark-mode .manager-email-status.status-failed { background: #3a2027; color:
     .managed-branch-card .branch-email-form > p,
     .managed-branch-card .branch-email-form > button { grid-column: 1; grid-row: auto; }
     .managed-branch-card .branch-email-form > button { justify-self: start; }
+}
+
+@media print {
+    body.statement-print-mode > :not(#customerStatementPrintArea) {
+        display: none !important;
+    }
+
+    body.statement-print-mode > #customerStatementPrintArea {
+        position: absolute;
+        inset: 0;
+        display: block !important;
+        width: 100%;
+        background: #fff;
+        color: #111827;
+        direction: rtl;
+    }
 }

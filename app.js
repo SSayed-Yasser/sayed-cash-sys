@@ -235,6 +235,16 @@ const APP_TRANSLATIONS = {
             'سجل النشاط': 'Activity Log',
             'آخر ظهور: ': 'Last seen: ',
             'السماح لحساب الفرع بدخول لوحة الإدارة': 'Allow this branch account to access the admin dashboard',
+            'الحفظ التلقائي لمسودات التقفيل على الجهاز': 'Automatically save closing drafts on this device',
+            'يحفظ مدخلات صفحة التقفيل محليًا لكل فرع لتبقى بعد التحديث أو انقطاع الإنترنت. هذا المفتاح يطبق على كل الفروع؛ والمسودات المخزنة تُمسح من زر صفحة التقفيل على كل جهاز.': 'Saves each branch’s closing inputs locally so they remain after refreshes or internet outages. This global switch applies to every branch; saved drafts must be cleared from the closing page on each device.',
+            'تم حفظ مدخلات التقفيل على هذا الجهاز.': 'Closing inputs saved on this device.',
+            'تم استعادة مسودة التقفيل المحفوظة على هذا الجهاز.': 'Restored the closing draft saved on this device.',
+            'تم مسح مسودة التقفيل المحفوظة من هذا الجهاز.': 'Cleared the closing draft saved on this device.',
+            'لا توجد مسودة محفوظة لهذا الفرع على هذا الجهاز.': 'There is no saved draft for this branch on this device.',
+            'مسح المسودة المحفوظة من هذا الجهاز': 'Clear saved draft from this device',
+            'مسح مسودة التقفيل المحفوظة لهذا الفرع من هذا الجهاز؟': 'Clear the saved closing draft for this branch from this device?',
+            'جارٍ تحميل حالة الحفظ المحلي...': 'Loading local saving setting...',
+            'الحفظ التلقائي المحلي متوقف من إدارة المتابعة.': 'Automatic local saving is disabled in monitoring settings.',
             'خصوصية أرباح الشيفت': 'Shift Profit Visibility',
             'إظهار الأرباح': 'Show profits',
             'تمويه الأرباح': 'Blur profits',
@@ -261,6 +271,15 @@ const APP_TRANSLATIONS = {
             'الوقت': 'Time',
             'الخط': 'Line',
             'آخر 3 أرقام': 'Last 3 Digits',
+            'إعدادات تفاصيل العمليات ورسائل الترتيب': 'Transaction Details & Ranking Messages',
+            'عدد أرقام العميل ومستويات القرب من المتصدر تُطبق على الفروع ورسائل المتابعة.': 'Customer digit count and ranking proximity levels apply to branches and monitoring messages.',
+            'أرقام العميل المسجلة مع العملية': 'Customer digits recorded with each transaction',
+            'آخر 4 أرقام': 'Last 4 Digits',
+            'قرب شديد — فرق حتى %': 'Very close — gap up to %',
+            'قرب — فرق حتى %': 'Close — gap up to %',
+            'بعيد — فرق حتى %': 'Far — gap up to %',
+            'النسب محسوبة من عمولات الفرع الأول؛ لازم تكون تصاعدية.': 'Percentages are based on the first-place branch fees and must be in ascending order.',
+            'حفظ إعدادات العمليات والترتيب': 'Save transaction and ranking settings',
             'المبلغ': 'Amount',
             'العمولة': 'Fee',
             'إجراءات': 'Actions',
@@ -647,6 +666,24 @@ const APP_TRANSLATIONS = {
             'العملاء المدينون': 'Debtors',
             'العملاء الدائنون': 'Creditors',
             'كشف حساب العميل': 'Customer Statement',
+            'طباعة الكشف': 'Print Statement',
+            'إجمالي سندات الصرف': 'Total Payment Vouchers',
+            'إجمالي سندات القبض': 'Total Receipt Vouchers',
+            'عدد الحركات المعروضة': 'Displayed Transactions',
+            'ابحث في البيان أو نوع السند...': 'Search notes or voucher type...',
+            'من': 'From',
+            'إلى': 'To',
+            'مسح الفلاتر': 'Clear Filters',
+            'التاريخ والوقت': 'Date & Time',
+            'نوع الحركة': 'Transaction Type',
+            'الرصيد بعد الحركة': 'Balance After',
+            'السبب / البيان': 'Reason / Description',
+            'الرصيد قبل الفترة': 'Balance Before Period',
+            'قبل الحركات المعروضة': 'Before Displayed Transactions',
+            'لا توجد حركات مطابقة للفلاتر المحددة.': 'No transactions match the selected filters.',
+            'عليه لنا': 'Owes Us',
+            'له لدينا': 'We Owe',
+            'متوازن': 'Settled',
             'إضافة عميل جديد': 'Add a New Customer',
             'اسم العميل:': 'Customer Name:',
             'رقم الهاتف:': 'Phone Number:',
@@ -970,7 +1007,6 @@ const APP_TRANSLATIONS = {
                 branchPerformanceCueActive: false,
                 branchPerformanceCueTimeout: null,
                 branchPerformanceCueEventId: '',
-                managerPerformanceStatusError: '',
                 globalAnnouncementForm: '',
                 globalPollForm: '',
                 managerMessageForm: {
@@ -1001,21 +1037,72 @@ const APP_TRANSLATIONS = {
                 managerActivityBranchName: '',
                 managerBranchMetrics: [],
                 managerLineMetrics: [],
+                managerClosingRows: [],
+                managerAuditLogs: [],
+                managerAuditLoading: false,
+                managerAuditFilter: 'all',
+                managerInsightSection: 'overview',
+                managerCommissionRules: {
+                    tiers: [
+                        { minAmount: 0, fee: 5 },
+                        { minAmount: 600, fee: 10 },
+                        { minAmount: 1091, fee: 15 },
+                        { minAmount: 1591, fee: 20 },
+                        { minAmount: 2091, fee: 25 },
+                        { minAmount: 2591, fee: 30 }
+                    ],
+                    incrementAmount: 500,
+                    incrementFee: 5
+                },
+                commissionRules: {
+                    tiers: [
+                        { minAmount: 0, fee: 5 },
+                        { minAmount: 600, fee: 10 },
+                        { minAmount: 1091, fee: 15 },
+                        { minAmount: 1591, fee: 20 },
+                        { minAmount: 2091, fee: 25 },
+                        { minAmount: 2591, fee: 30 }
+                    ],
+                    incrementAmount: 500,
+                    incrementFee: 5
+                },
+                dailyTargets: { date: '', enabled: false, targetProfit: 4000, rewardAmount: 100, branches: {} },
+                managerLedgers: [],
+                commissionRulesUnsubscribe: null,
+                dailyTargetsUnsubscribe: null,
+                managerLedgersUnsubscribe: null,
+                commissionRulesReady: false,
+                commissionRulesError: '',
+                managerDailyTargetSaving: false,
+                managerCommissionRulesSaving: false,
                 managerInsightQuestion: '',
                 managerInsightChat: [],
                 managerInsightsBusy: false,
                 managerManualRunBusy: false,
+                managerDashboardRefreshBusy: false,
+                managerInsightsTimer: null,
                 managerInsightsError: '',
                 managerInsightsLastUpdated: 0,
-                managerInsightsTimer: null,
                 managerMonitoringSettings: {
-                    reportsEnabled: true,
                     outboundEnabled: true,
                     cashierInteractionEnabled: true,
                     remindersEnabled: true,
-                    refreshIntervalMinutes: 15
+                    autoRefreshEnabled: false,
+                    refreshIntervalMinutes: 60,
+                    closingDraftsEnabled: true,
+                    customerNumberDigits: 4,
+                    rankingVeryClosePercent: 5,
+                    rankingClosePercent: 20,
+                    rankingFarPercent: 50
+                },
+                branchExperienceSettings: {
+                    customerNumberDigits: 4,
+                    rankingVeryClosePercent: 5,
+                    rankingClosePercent: 20,
+                    rankingFarPercent: 50
                 },
                 managerMonitoringLoaded: false,
+                closingDraftSettingReady: false,
                 assistantNoticeBusy: false,
                 assistantNoticeError: '',
                 showManagerBackupPreview: false,
@@ -1056,6 +1143,8 @@ const APP_TRANSLATIONS = {
                 firebaseSyncStatus: 'غير متصل',
                 firebaseSyncVersion: 0,
                 firebaseUnsubscribe: null,
+                branchExperienceSettingsUnsubscribe: null,
+                closingDraftSettingUnsubscribe: null,
                 // SYSTEM DATA
                 masterOpeningBalance: 30000,
                 drawerOpeningBalance: 0,
@@ -1081,8 +1170,8 @@ const APP_TRANSLATIONS = {
                 // CASHIER FORM STATES
                 pinnedDepositWalletId: null,
                 pinnedWithdrawWalletId: null,
-                cashierDeposit: { walletId: '', amount: null, fee: null, customerName: '', lastThree: '' },
-                cashierWithdraw: { walletId: '', amount: null, fee: null, customerName: '', lastThree: '' },
+                cashierDeposit: { walletId: '', amount: null, fee: null, feeEdited: false, customerName: '', lastThree: '' },
+                cashierWithdraw: { walletId: '', amount: null, fee: null, feeEdited: false, customerName: '', lastThree: '' },
                 cashierSaveInProgress: false,
                 pendingCashierTransaction: null,
                 cashierSearch: '',
@@ -1095,6 +1184,8 @@ const APP_TRANSLATIONS = {
                 closingDraggedWalletId: null,
                 selectedClosingReportId: '',
                 closingSaveInProgress: false,
+                closingDraftStatus: '',
+                closingDraftError: '',
 
                 // MODAL STATES & FORMS
                 showWalletModal: false,
@@ -1110,10 +1201,18 @@ const APP_TRANSLATIONS = {
                 voucherCustomerSearch: '',
                 voucherCustomerDropdownOpen: false,
                 voucherSearch: '',
+                voucherReportFilter: { mode: 'today', customerId: '', fromDate: '', toDate: '' },
+                voucherReportCustomerSearch: '',
+                voucherReportCustomerDropdownOpen: false,
+                showVoucherReportModal: false,
+
+                debtorSearch: '',
+                creditorSearch: '',
 
                 showStatementModal: false,
                 selectedCustomer: {},
                 selectedCustomerVouchers: [],
+                customerStatementFilter: { search: '', fromDate: '', toDate: '' },
 
                 reportFilter: { fromDate: '', toDate: '' },
                 reportResult: { totalFees: 0, depositVolume: 0, withdrawVolume: 0, count: 0, receiptVouchers: 0, paymentVouchers: 0 },
@@ -1147,7 +1246,7 @@ const APP_TRANSLATIONS = {
                             if (this.currentBranch?.id) this.refreshServerClock();
                             else this.checkConnectionNow();
                         }
-                    }, 60000);
+                    }, 15 * 60 * 1000);
                     this.reportFilter.fromDate = this.getLocalDateString();
                     this.reportFilter.toDate = this.reportFilter.fromDate;
                     this.walletReportFilter.fromDate = this.reportFilter.fromDate;
@@ -1350,6 +1449,7 @@ const APP_TRANSLATIONS = {
                 },
 
                 getLocalizedText(node, language) {
+                    if (node.parentElement?.closest('[data-preserve-latin]')) return node.nodeValue;
                     if (this.isBusinessDataText(node)) {
                         return this.translateUiText(node.nodeValue, language, true);
                     }
@@ -1461,7 +1561,7 @@ const APP_TRANSLATIONS = {
                             } else if (navigator.onLine) {
                                 this.checkConnectionNow();
                             }
-                        }, 5000);
+                        }, 30000);
                     }
                 },
 
@@ -1486,6 +1586,7 @@ const APP_TRANSLATIONS = {
                     try {
                         if (this.currentBranch?.id && this.firebaseService) {
                             await this.firebaseService.checkBranchConnection(this.currentBranch.id);
+                            await this.firebaseService.flushPendingWrites(this.currentBranch.id);
                             this.markAppOnline();
                             await this.refreshServerClock();
                         } else if (this.firebaseService) {
@@ -1508,7 +1609,6 @@ const APP_TRANSLATIONS = {
                     if (this.serverClockRefreshInProgress || !this.currentBranch?.id || !this.firebaseService || !navigator.onLine) return;
                     this.serverClockRefreshInProgress = true;
                     try {
-                        await this.firebaseService.checkBranchConnection(this.currentBranch.id);
                         const serverTime = await this.firebaseService.getBranchServerTime(this.currentBranch.id);
                         this.updateServerClock(serverTime);
                         this.markAppOnline();
@@ -1556,8 +1656,12 @@ const APP_TRANSLATIONS = {
                                     this.managerEmailsError = '';
                                     this.managerEmailTestStatus = '';
                                     this.stopManagedBranchWatchers();
-                                    if (this.managerInsightsTimer) window.clearInterval(this.managerInsightsTimer);
-                                    this.managerInsightsTimer = null;
+                                    if (this.commissionRulesUnsubscribe) this.commissionRulesUnsubscribe();
+                                    this.commissionRulesUnsubscribe = null;
+                                    if (this.dailyTargetsUnsubscribe) this.dailyTargetsUnsubscribe();
+                                    this.dailyTargetsUnsubscribe = null;
+                                    if (this.managerLedgersUnsubscribe) this.managerLedgersUnsubscribe();
+                                    this.managerLedgersUnsubscribe = null;
                                 }
                                 if (this.firebaseUnsubscribe) this.firebaseUnsubscribe();
                                 this.firebaseUnsubscribe = null;
@@ -1565,6 +1669,11 @@ const APP_TRANSLATIONS = {
                                 this.deviceUnsubscribe = null;
                                 if (this.branchAccessUnsubscribe) this.branchAccessUnsubscribe();
                                 this.branchAccessUnsubscribe = null;
+                                if (this.branchExperienceSettingsUnsubscribe) this.branchExperienceSettingsUnsubscribe();
+                                this.branchExperienceSettingsUnsubscribe = null;
+                                if (this.closingDraftSettingUnsubscribe) this.closingDraftSettingUnsubscribe();
+                                this.closingDraftSettingUnsubscribe = null;
+                                this.closingDraftSettingReady = false;
                                 if (user) {
                                     this.firebaseBusy = true;
                                     window.updateSamaSplashStatus?.('جاري تحميل بيانات الفروع...');
@@ -1590,6 +1699,10 @@ const APP_TRANSLATIONS = {
                                     this.currentMode = 'cashier';
                                     this.managerSettingsUnlocked = false;
                                     this.managerBranchesLoaded = false;
+                                    this.managerLedgers = [];
+                                    this.dailyTargets = { date: '', enabled: false, targetProfit: 4000, rewardAmount: 100, branches: {} };
+                                    this.managerMonitoringSettings.closingDraftsEnabled = true;
+                                    this.closingDraftSettingReady = false;
                                     this.applyCloudSnapshot({});
                                     window.dismissSamaSplash?.();
                                 }
@@ -1617,12 +1730,91 @@ const APP_TRANSLATIONS = {
                     const email = user.email?.trim().toLowerCase() || '';
                     this.isSystemAdmin = email === this.managerEmail;
                     this.managerSettingsUnlocked = this.isSystemAdmin;
+                    this.commissionRulesReady = false;
+                    this.commissionRulesError = '';
+                    try {
+                        this.commissionRules = await this.firebaseService.getCommissionRules();
+                        this.managerCommissionRules = JSON.parse(JSON.stringify(this.commissionRules));
+                        this.commissionRulesReady = true;
+                        if (this.commissionRulesUnsubscribe) this.commissionRulesUnsubscribe();
+                        this.commissionRulesUnsubscribe = this.firebaseService.watchCommissionRules(
+                            rules => {
+                                if (this.firebaseUser?.uid !== user.uid) return;
+                                this.commissionRules = rules;
+                                this.commissionRulesReady = true;
+                                this.commissionRulesError = '';
+                                if (this.isSystemAdmin) {
+                                    this.managerCommissionRules = JSON.parse(JSON.stringify(rules));
+                                }
+                            },
+                            error => {
+                                if (this.firebaseUser?.uid !== user.uid) return;
+                                this.commissionRulesReady = false;
+                                this.commissionRulesError = this.describeFirebaseError(error);
+                                console.error('Commission rules could not be watched:', error);
+                            }
+                        );
+                    } catch (error) {
+                        this.commissionRulesError = this.describeFirebaseError(error);
+                        this.firebaseAuthError = `تعذر تحميل جدول العمولات: ${this.commissionRulesError}`;
+                        console.error('Commission rules could not be loaded:', error);
+                    }
+                    if (this.dailyTargetsUnsubscribe) this.dailyTargetsUnsubscribe();
+                    this.dailyTargetsUnsubscribe = this.firebaseService.watchDailyTargets(
+                        targets => {
+                            if (this.firebaseUser?.uid !== user.uid) return;
+                            this.dailyTargets = targets;
+                        },
+                        error => {
+                            if (this.firebaseUser?.uid !== user.uid) return;
+                            this.managerError = `تعذر تحميل أهداف اليوم: ${this.describeFirebaseError(error)}`;
+                            console.error('Daily branch targets could not be watched:', error);
+                        }
+                    );
+                    this.branchExperienceSettings = {
+                        ...this.branchExperienceSettings,
+                        ...await this.firebaseService.getBranchExperienceSettings()
+                    };
+                    if (this.branchExperienceSettingsUnsubscribe) this.branchExperienceSettingsUnsubscribe();
+                    this.branchExperienceSettingsUnsubscribe = this.firebaseService.watchBranchExperienceSettings(
+                        settings => {
+                            if (this.firebaseUser?.uid !== user.uid) return;
+                            this.branchExperienceSettings = settings;
+                            if (this.isSystemAdmin) Object.assign(this.managerMonitoringSettings, settings);
+                        },
+                        error => {
+                            if (this.firebaseUser?.uid !== user.uid) return;
+                            this.firebaseAuthError = this.describeFirebaseError(error);
+                            console.error('Branch experience settings could not be watched:', error);
+                        }
+                    );
+                    if (this.closingDraftSettingUnsubscribe) this.closingDraftSettingUnsubscribe();
+                    this.closingDraftSettingUnsubscribe = this.firebaseService.watchClosingDraftsSetting(
+                        enabled => {
+                            if (this.firebaseUser?.uid !== user.uid) return;
+                            this.managerMonitoringSettings.closingDraftsEnabled = enabled;
+                            this.closingDraftSettingReady = true;
+                            if (enabled && this.currentBranch?.id) this.restoreClosingDraft();
+                        },
+                        error => {
+                            if (this.firebaseUser?.uid !== user.uid) return;
+                            this.closingDraftError = `تعذر تحميل حالة الحفظ التلقائي للمسودات: ${this.describeFirebaseError(error)}`;
+                            console.error('Closing draft setting could not be watched:', error);
+                        }
+                    );
                     if (this.isSystemAdmin && this.selectedBranchId !== '__manager__') {
                         this.managerMonitoringLoaded = false;
                         try {
                             this.managerMonitoringSettings = {
                                 ...this.managerMonitoringSettings,
                                 ...await this.firebaseService.getManagerMonitoringSettings()
+                            };
+                            this.branchExperienceSettings = {
+                                ...this.branchExperienceSettings,
+                                customerNumberDigits: this.managerMonitoringSettings.customerNumberDigits,
+                                rankingVeryClosePercent: this.managerMonitoringSettings.rankingVeryClosePercent,
+                                rankingClosePercent: this.managerMonitoringSettings.rankingClosePercent,
+                                rankingFarPercent: this.managerMonitoringSettings.rankingFarPercent
                             };
                             this.managerMonitoringLoaded = true;
                         } catch (error) {
@@ -1732,30 +1924,7 @@ const APP_TRANSLATIONS = {
                     if (document.body) delete document.body.dataset.performanceCue;
                     this.firebaseDataReady = false;
                     this.dataOwnerBranchId = branch.id;
-                    this.managerPerformanceStatusError = '';
                     this.branchPerformanceCueEventId = '';
-                    if (this.isSystemAdmin && !branch.communication?.performanceStatus) {
-                        try {
-                            if (!this.managerBranchesLoaded) await this.loadManagedBranches();
-                            await this.loadManagerInsights();
-                            await this.saveManagerBranchPerformanceStatuses();
-                            this.stopManagedBranchWatchers();
-                            const managedBranch = this.managedBranches.find(item => item.id === branch.id);
-                            if (managedBranch?.communication?.performanceStatus) {
-                                branch = {
-                                    ...branch,
-                                    communication: {
-                                        ...(branch.communication || {}),
-                                        performanceStatus: managedBranch.communication.performanceStatus
-                                    }
-                                };
-                            }
-                        } catch (error) {
-                            this.managerPerformanceStatusError = `تعذر تجهيز ترتيب الفروع: ${this.describeFirebaseError(error)}`;
-                            this.managerError = this.managerPerformanceStatusError;
-                            console.error('Branch performance status could not be initialized from the manager dashboard:', error);
-                        }
-                    }
                     this.currentBranch = branch;
                     try {
                         this.branchAnnouncementDismissedId = localStorage.getItem(`sama-branch-announcement-dismissed:${branch.id}`) || '';
@@ -1820,6 +1989,8 @@ const APP_TRANSLATIONS = {
                         this.firebaseUnsubscribe = null;
                         return;
                     }
+
+                    await this.firebaseService.flushPendingWrites(branch.id);
 
                     const migration = await this.firebaseService.migrateLegacySnapshot(
                         branch.id,
@@ -1938,6 +2109,7 @@ const APP_TRANSLATIONS = {
                     this.pinnedWithdrawWalletId = snapshot.pinnedWithdrawWalletId || null;
                     if (this.pinnedDepositWalletId) this.cashierDeposit.walletId = this.pinnedDepositWalletId;
                     if (this.pinnedWithdrawWalletId) this.cashierWithdraw.walletId = this.pinnedWithdrawWalletId;
+                    this.restoreClosingDraft();
                 },
 
                 activateBranchPerformanceCue(performanceStatus) {
@@ -2066,6 +2238,11 @@ const APP_TRANSLATIONS = {
                     this.deviceUnsubscribe = null;
                     if (this.branchAccessUnsubscribe) this.branchAccessUnsubscribe();
                     this.branchAccessUnsubscribe = null;
+                    if (this.branchExperienceSettingsUnsubscribe) this.branchExperienceSettingsUnsubscribe();
+                    this.branchExperienceSettingsUnsubscribe = null;
+                    if (this.closingDraftSettingUnsubscribe) this.closingDraftSettingUnsubscribe();
+                    this.closingDraftSettingUnsubscribe = null;
+                    this.closingDraftSettingReady = false;
                     if (this.firebaseUnsubscribe) this.firebaseUnsubscribe();
                     this.firebaseUnsubscribe = null;
                     try {
@@ -2090,6 +2267,13 @@ const APP_TRANSLATIONS = {
                         this.managerMonitoringSettings = {
                             ...this.managerMonitoringSettings,
                             ...await this.firebaseService.getManagerMonitoringSettings()
+                        };
+                        this.branchExperienceSettings = {
+                            ...this.branchExperienceSettings,
+                            customerNumberDigits: this.managerMonitoringSettings.customerNumberDigits,
+                            rankingVeryClosePercent: this.managerMonitoringSettings.rankingVeryClosePercent,
+                            rankingClosePercent: this.managerMonitoringSettings.rankingClosePercent,
+                            rankingFarPercent: this.managerMonitoringSettings.rankingFarPercent
                         };
                         this.managerMonitoringLoaded = true;
                     } catch (error) {
@@ -2120,65 +2304,113 @@ const APP_TRANSLATIONS = {
                         passwordConfirmDraft: '',
                         announcementDraft: branch.announcement?.message || ''
                     }));
+                    this.ensureDailyTargetBranches();
                     this.firebaseBranches = await this.firebaseService.getPublicBranches();
                     this.managerBranchesLoaded = true;
+                    await this.refreshManagedBranchDetails(false);
+                    this.updateManagerInsightsTimer();
+                },
+
+                async refreshManagedBranchDetails(refreshCommunications = true) {
+                    if (!this.firebaseService) return;
                     this.managerEmailsLoading = true;
                     this.managerEmailsError = '';
-                    this.managedBranchUnsubscribers.push(this.firebaseService.watchManagerEmails(
-                        100,
-                        emails => {
-                            this.managerEmailLogs = emails;
-                            if (this.selectedManagerEmail) {
-                                const updatedEmail = emails.find(email => email.id === this.selectedManagerEmail.id);
-                                if (updatedEmail) this.selectedManagerEmail = updatedEmail;
-                            }
-                            this.managerEmailsLoading = false;
-                        },
-                        error => {
-                            this.managerEmailsError = `تعذر تحميل سجل البريد: ${this.describeFirebaseError(error)}`;
-                            this.managerEmailsLoading = false;
-                            console.error('Manager email history could not be loaded:', error);
+                    try {
+                        const [ledgers, emails, branchDetails] = await Promise.all([
+                            this.firebaseService.getRecentManagerLedgers(100),
+                            this.firebaseService.getRecentManagerEmails(100),
+                            Promise.all(this.managedBranches.map(async branch => {
+                                const [communication, monitoringAlertHistory, devices] = await Promise.all([
+                                    refreshCommunications
+                                        ? this.firebaseService.getBranchCommunications(branch.id)
+                                        : Promise.resolve(branch.communication),
+                                    this.firebaseService.getRecentBranchMonitoringAlerts(branch.id, 5),
+                                    this.firebaseService.getBranchDeviceList(branch.id)
+                                ]);
+                                return { branchId: branch.id, communication, monitoringAlertHistory, devices };
+                            }))
+                        ]);
+                        this.managerLedgers = ledgers;
+                        this.managerEmailLogs = emails;
+                        if (this.selectedManagerEmail) {
+                            this.selectedManagerEmail = emails.find(email =>
+                                email.id === this.selectedManagerEmail.id
+                            ) || this.selectedManagerEmail;
                         }
-                    ));
-                    this.managedBranches.forEach(branch => {
-                        this.managedBranchUnsubscribers.push(this.firebaseService.watchBranchCommunication(
-                            branch.id,
-                            communication => {
-                                const current = this.managedBranches.find(item => item.id === branch.id);
-                                if (current) current.communication = communication;
-                            },
-                            error => {
-                                this.managerError = this.describeFirebaseError(error);
-                                console.error(`Communication responses for branch ${branch.name} failed:`, error);
-                            }
-                        ));
-                        this.managedBranchUnsubscribers.push(this.firebaseService.watchBranchMonitoringAlerts(
-                            branch.id,
-                            20,
-                            alerts => {
-                                const current = this.managedBranches.find(item => item.id === branch.id);
-                                if (current) current.monitoringAlertHistory = alerts;
-                            },
-                            error => {
-                                this.managerError = this.describeFirebaseError(error);
-                                console.error(`Monitoring alerts for branch ${branch.name} failed:`, error);
-                            }
-                        ));
-                        this.managedBranchUnsubscribers.push(this.firebaseService.watchBranchDeviceList(
-                            branch.id,
-                            devices => {
-                                const current = this.managedBranches.find(item => item.id === branch.id);
-                                if (current) {
-                                    current.devices = devices;
-                                    current.activeDevices = devices.filter(device => device.online && device.enabled).length;
-                                }
-                            },
-                            error => {
-                                this.managerError = this.describeFirebaseError(error);
-                                console.error(`Device count for branch ${branch.name} failed:`, error);
-                            }
-                        ));
-                    });
+                        branchDetails.forEach(details => {
+                            const branch = this.managedBranches.find(item => item.id === details.branchId);
+                            if (!branch) return;
+                            branch.communication = details.communication;
+                            branch.monitoringAlertHistory = details.monitoringAlertHistory;
+                            branch.devices = details.devices;
+                            branch.activeDevices = details.devices.filter(device =>
+                                device.online && device.enabled
+                            ).length;
+                        });
+                    } catch (error) {
+                        this.managerEmailsError = `تعذر تحديث بيانات المتابعة: ${this.describeFirebaseError(error)}`;
+                        console.error('Manager monitoring data could not be refreshed:', error);
+                        throw error;
+                    } finally {
+                        this.managerEmailsLoading = false;
+                    }
+                },
+
+                async refreshManagerEmailLogs() {
+                    if (!this.firebaseService || this.managerEmailsLoading) return false;
+                    this.managerEmailsLoading = true;
+                    this.managerEmailsError = '';
+                    try {
+                        const emails = await this.firebaseService.getRecentManagerEmails(100);
+                        this.managerEmailLogs = emails;
+                        if (this.selectedManagerEmail) {
+                            this.selectedManagerEmail = emails.find(email =>
+                                email.id === this.selectedManagerEmail.id
+                            ) || this.selectedManagerEmail;
+                        }
+                        return true;
+                    } catch (error) {
+                        this.managerEmailsError = `تعذر تحديث البريد الداخلي: ${this.describeFirebaseError(error)}`;
+                        console.error('Internal manager email list could not be refreshed:', error);
+                        return false;
+                    } finally {
+                        this.managerEmailsLoading = false;
+                    }
+                },
+
+                updateManagerInsightsTimer() {
+                    if (this.managerInsightsTimer) {
+                        window.clearInterval(this.managerInsightsTimer);
+                        this.managerInsightsTimer = null;
+                    }
+                    if (this.managerAdminPage !== 'insights'
+                        || this.managerMonitoringSettings.autoRefreshEnabled !== true) return;
+                    const intervalMinutes = [15, 30, 60].includes(
+                        Number(this.managerMonitoringSettings.refreshIntervalMinutes)
+                    ) ? Number(this.managerMonitoringSettings.refreshIntervalMinutes) : 60;
+                    this.managerInsightsTimer = window.setInterval(() => {
+                        if (this.managerAdminPage === 'insights'
+                            && this.managerMonitoringSettings.autoRefreshEnabled === true) {
+                            this.loadManagerInsights();
+                        }
+                    }, intervalMinutes * 60 * 1000);
+                },
+
+                async refreshManagerDashboard() {
+                    if (!this.managerSettingsUnlocked
+                        || !this.firebaseService
+                        || this.managerDashboardRefreshBusy) return false;
+                    this.managerDashboardRefreshBusy = true;
+                    try {
+                        await this.refreshManagedBranchDetails(true);
+                        return await this.loadManagerInsights();
+                    } catch (error) {
+                        this.managerInsightsError = `تعذر تحديث بيانات المتابعة: ${this.describeFirebaseError(error)}`;
+                        console.error('Manager dashboard refresh failed:', error);
+                        return false;
+                    } finally {
+                        this.managerDashboardRefreshBusy = false;
+                    }
                 },
 
                 async setManagedDeviceEnabled(branch, device, enabled) {
@@ -2456,7 +2688,8 @@ const APP_TRANSLATIONS = {
                         || !['branches', 'communications', 'backup', 'insights', 'emails'].includes(page)) return;
                     this.managerAdminPage = page;
                     this.updateManagerInsightsTimer();
-                    if (page === 'insights') this.loadManagerInsights();
+                    if (page === 'insights' && this.managerMonitoringSettings.autoRefreshEnabled) this.loadManagerInsights();
+                    if (page === 'emails') this.refreshManagerEmailLogs();
                 },
 
                 async sendManagerEmailTest() {
@@ -2468,9 +2701,10 @@ const APP_TRANSLATIONS = {
                     try {
                         await this.firebaseService.saveInternalManagerEmail({
                             subject: '[سما فون] اختبار رسالة البريد الداخلي',
-                            text: `دي رسالة اختبار محفوظة داخل بريد النظام فقط.\nوقت الحفظ: ${new Date().toLocaleString('ar-EG', { timeZone: 'Africa/Cairo' })}\nلم يتم إرسالها إلى أي بريد خارجي.`,
+                            text: `دي رسالة اختبار محفوظة داخل بريد النظام فقط.\nوقت الحفظ: ${new Date().toLocaleString(this.getDateTimeLocale(), { timeZone: 'Africa/Cairo' })}\nلم يتم إرسالها إلى أي بريد خارجي.`,
                             category: 'test'
                         });
+                        await this.refreshManagerEmailLogs();
                         this.managerEmailTestStatus = 'تم حفظ رسالة الاختبار في صفحة البريد فقط. لم يُرسل بريد خارجي.';
                     } catch (error) {
                         this.managerEmailsError = `تعذر حفظ رسالة الاختبار: ${this.describeFirebaseError(error)}`;
@@ -2489,19 +2723,6 @@ const APP_TRANSLATIONS = {
                     this.selectedManagerEmail = null;
                 },
 
-                updateManagerInsightsTimer() {
-                    if (this.managerInsightsTimer) {
-                        window.clearInterval(this.managerInsightsTimer);
-                        this.managerInsightsTimer = null;
-                    }
-                    const intervalMinutes = Number(this.managerMonitoringSettings.refreshIntervalMinutes) || 0;
-                    if (this.managerAdminPage === 'insights' && intervalMinutes > 0) {
-                        this.managerInsightsTimer = window.setInterval(() => {
-                            if (this.managerAdminPage === 'insights') this.loadManagerInsights();
-                        }, intervalMinutes * 60 * 1000);
-                    }
-                },
-
                 async runManagerMonitoringNow() {
                     if (!this.managerSettingsUnlocked
                         || !this.firebaseService
@@ -2514,8 +2735,7 @@ const APP_TRANSLATIONS = {
                     this.managerNotice = '';
                     this.managerNoticeDetails = '';
                     try {
-                        const refreshed = await this.loadManagerInsights();
-                        if (!refreshed) return;
+                        if (!await this.loadManagerInsights()) return;
 
                         const ranked = this.managerBranchMetrics
                             .filter(branch => branch.active)
@@ -2525,8 +2745,7 @@ const APP_TRANSLATIONS = {
                                 || left.name.localeCompare(right.name)
                             );
                         const alerts = this.getManagerInsightAlerts();
-                        const now = new Date();
-                        const timestamp = now.toLocaleString('ar-EG', { timeZone: 'Africa/Cairo' });
+                        const timestamp = new Date().toLocaleString(this.getDateTimeLocale(), { timeZone: 'Africa/Cairo' });
                         const text = [
                             `تقرير Sama Phone — ${timestamp}`,
                             'ترتيب الفروع حسب عدد عمليات اليوم ثم العمولات:',
@@ -2562,6 +2781,7 @@ const APP_TRANSLATIONS = {
                             text,
                             category: 'manual_report'
                         });
+                        await this.refreshManagerEmailLogs();
                         this.managerStatus = `اتراجع ${ranked.length} فرع، واتحفظ التقرير في صفحة البريد الداخلية فقط، من غير إرسال لبريد خارجي. عدد التنبيهات: ${alerts.length}.`;
                         if (rankingError) {
                             this.managerNotice = 'تم حفظ التقرير، لكن تعذر تحديث ترتيب الفروع.';
@@ -2587,11 +2807,12 @@ const APP_TRANSLATIONS = {
                 async saveManagerMonitoringSettings(field, value) {
                     if (!this.managerSettingsUnlocked || this.managerBusy || !this.managerMonitoringLoaded) return;
                     const allowedFields = [
-                        'reportsEnabled',
+                        'autoRefreshEnabled',
+                        'refreshIntervalMinutes',
                         'outboundEnabled',
                         'cashierInteractionEnabled',
                         'remindersEnabled',
-                        'refreshIntervalMinutes'
+                        'closingDraftsEnabled'
                     ];
                     if (!allowedFields.includes(field)) return;
                     const previousValue = this.managerMonitoringSettings[field];
@@ -2604,11 +2825,276 @@ const APP_TRANSLATIONS = {
                             [field]: value
                         });
                         Object.assign(this.managerMonitoringSettings, saved);
-                        this.updateManagerInsightsTimer();
                         this.managerStatus = 'تم حفظ إعدادات المتابعة والتنبيهات.';
+                        if (field === 'autoRefreshEnabled' || field === 'refreshIntervalMinutes') {
+                            this.updateManagerInsightsTimer();
+                            if (field === 'autoRefreshEnabled' && value === true
+                                && this.managerAdminPage === 'insights') {
+                                await this.refreshManagerDashboard();
+                            }
+                        }
                     } catch (error) {
                         this.managerMonitoringSettings[field] = previousValue;
                         this.managerError = `تعذر حفظ إعداد المتابعة: ${this.describeFirebaseError(error)}`;
+                    } finally {
+                        this.managerBusy = false;
+                    }
+                },
+
+                ensureDailyTargetBranches() {
+                    if (!this.dailyTargets.date) this.dailyTargets.date = this.getLocalDateString();
+                    if (!this.dailyTargets.branches || typeof this.dailyTargets.branches !== 'object') {
+                        this.dailyTargets.branches = {};
+                    }
+                    this.managedBranches.forEach(branch => {
+                        if (!this.dailyTargets.branches[branch.id]) {
+                            this.dailyTargets.branches[branch.id] = {
+                                enabled: true,
+                                targetProfit: null,
+                                rewardAmount: null
+                            };
+                        }
+                    });
+                },
+
+                getActiveDailyTarget(branchId = this.currentBranch?.id) {
+                    if (!branchId || !this.dailyTargets.enabled) return null;
+                    const today = this.getLocalDateString(this.getTrustedNow() || new Date());
+                    if (this.dailyTargets.date !== today) return null;
+                    const branchTarget = this.dailyTargets.branches?.[branchId] || {};
+                    if (branchTarget.enabled === false) return null;
+                    const targetProfit = Number(branchTarget.targetProfit ?? this.dailyTargets.targetProfit);
+                    const rewardAmount = Number(branchTarget.rewardAmount ?? this.dailyTargets.rewardAmount);
+                    if (!Number.isFinite(targetProfit) || targetProfit <= 0
+                        || !Number.isFinite(rewardAmount) || rewardAmount < 0) return null;
+                    return { targetProfit, rewardAmount };
+                },
+
+                getCashierGoalProgress() {
+                    const target = this.getActiveDailyTarget();
+                    const profit = this.calculateCurrentShiftProfit();
+                    const targetProfit = target?.targetProfit || 0;
+                    return {
+                        profit,
+                        target: targetProfit,
+                        reward: target?.rewardAmount || 0,
+                        remaining: Math.max(0, targetProfit - profit),
+                        percent: targetProfit > 0 ? Math.min(100, profit / targetProfit * 100) : 0,
+                        achieved: targetProfit > 0 && profit >= targetProfit
+                    };
+                },
+
+                getBranchShiftProfit(branchId) {
+                    return Number(this.managerBranchMetrics.find(branch => branch.id === branchId)?.currentShiftProfit) || 0;
+                },
+
+                addCommissionTier() {
+                    const tiers = this.managerCommissionRules.tiers;
+                    const last = tiers[tiers.length - 1];
+                    if (!last) return;
+                    tiers.push({
+                        minAmount: Number(last.minAmount) + Number(this.managerCommissionRules.incrementAmount),
+                        fee: Number(last.fee) + Number(this.managerCommissionRules.incrementFee)
+                    });
+                },
+
+                removeCommissionTier(index) {
+                    if (this.managerCommissionRules.tiers.length <= 1) return;
+                    this.managerCommissionRules.tiers.splice(index, 1);
+                },
+
+                async saveManagerCommissionRules() {
+                    if (!this.managerSettingsUnlocked || this.managerCommissionRulesSaving) return;
+                    const rules = {
+                        tiers: this.managerCommissionRules.tiers.map(tier => ({
+                            minAmount: Number(tier.minAmount),
+                            fee: Number(tier.fee)
+                        })).sort((left, right) => left.minAmount - right.minAmount),
+                        incrementAmount: Number(this.managerCommissionRules.incrementAmount),
+                        incrementFee: Number(this.managerCommissionRules.incrementFee)
+                    };
+                    const validTiers = rules.tiers.length > 0
+                        && rules.tiers[0].minAmount === 0
+                        && rules.tiers.every((tier, index) =>
+                            Number.isFinite(tier.minAmount) && tier.minAmount >= 0
+                            && Number.isFinite(tier.fee) && tier.fee >= 0
+                            && (!index || tier.minAmount > rules.tiers[index - 1].minAmount)
+                        );
+                    if (!validTiers || !Number.isFinite(rules.incrementAmount) || rules.incrementAmount <= 0
+                        || !Number.isFinite(rules.incrementFee) || rules.incrementFee < 0) {
+                        this.managerError = 'راجع جدول العمولات: يبدأ من مبلغ 0، والحدود تصاعدية، وزيادة ما بعد آخر شريحة صحيحة.';
+                        return;
+                    }
+                    this.managerCommissionRulesSaving = true;
+                    this.managerError = '';
+                    try {
+                        this.managerCommissionRules = await this.firebaseService.saveCommissionRules(rules);
+                        this.commissionRules = this.managerCommissionRules;
+                        this.commissionRulesReady = true;
+                        this.managerStatus = 'تم حفظ جدول العمولات الموحد، وسيظهر تلقائيًا على شاشات الكاشير.';
+                    } catch (error) {
+                        this.managerError = `تعذر حفظ جدول العمولات: ${this.describeFirebaseError(error)}`;
+                    } finally {
+                        this.managerCommissionRulesSaving = false;
+                    }
+                },
+
+                async saveManagerDailyTargets() {
+                    if (!this.managerSettingsUnlocked || this.managerDailyTargetSaving) return;
+                    this.ensureDailyTargetBranches();
+                    const targets = {
+                        date: String(this.dailyTargets.date || ''),
+                        enabled: this.dailyTargets.enabled === true,
+                        targetProfit: Number(this.dailyTargets.targetProfit),
+                        rewardAmount: Number(this.dailyTargets.rewardAmount),
+                        branches: this.dailyTargets.branches
+                    };
+                    if ((targets.enabled && !/^\d{4}-\d{2}-\d{2}$/.test(targets.date))
+                        || !Number.isFinite(targets.targetProfit) || targets.targetProfit < 0
+                        || !Number.isFinite(targets.rewardAmount) || targets.rewardAmount < 0) {
+                        this.managerError = 'أدخل تاريخًا صحيحًا وهدفًا ومكافأة غير سالبة قبل الحفظ.';
+                        return;
+                    }
+                    this.managerDailyTargetSaving = true;
+                    this.managerError = '';
+                    try {
+                        this.dailyTargets = await this.firebaseService.saveDailyTargets(targets);
+                        this.ensureDailyTargetBranches();
+                        this.managerStatus = targets.enabled
+                            ? `تم حفظ هدف ${targets.date}. ستُسجل المكافأة تلقائيًا مرة واحدة عند تحقيقه.`
+                            : 'تم حفظ إعدادات الهدف وإيقاف مكافآت الهدف لهذا اليوم.';
+                    } catch (error) {
+                        this.managerError = `تعذر حفظ هدف اليوم: ${this.describeFirebaseError(error)}`;
+                    } finally {
+                        this.managerDailyTargetSaving = false;
+                    }
+                },
+
+                async loadManagerAuditLogs() {
+                    if (!this.managerSettingsUnlocked || !this.firebaseService || this.managerAuditLoading) return;
+                    this.managerAuditLoading = true;
+                    try {
+                        const branchEntries = await Promise.all(this.managedBranches.map(async branch => ({
+                            branch,
+                            entries: await this.firebaseService.getAllBranchActivity(branch.id)
+                        })));
+                        this.managerAuditLogs = branchEntries.flatMap(({ branch, entries }) =>
+                            entries.filter(entry =>
+                                ['updated', 'deleted'].includes(entry.action)
+                                && ['transactions', 'vouchers'].includes(entry.collection)
+                            ).map(entry => ({ ...entry, branchName: branch.name }))
+                        ).sort((left, right) =>
+                            new Date(right.occurredAt || 0).getTime() - new Date(left.occurredAt || 0).getTime()
+                        );
+                    } catch (error) {
+                        this.managerError = `تعذر تحميل سجل التعديلات: ${this.describeFirebaseError(error)}`;
+                    } finally {
+                        this.managerAuditLoading = false;
+                    }
+                },
+
+                getFilteredManagerAuditLogs() {
+                    return this.managerAuditLogs.filter(entry =>
+                        this.managerAuditFilter === 'all' || entry.collection === this.managerAuditFilter
+                    );
+                },
+
+                formatManagerAuditDetails(details) {
+                    const labels = {
+                        type: 'النوع',
+                        walletId: 'الخط',
+                        amount: 'المبلغ',
+                        fee: 'العمولة',
+                        datetime: 'التاريخ',
+                        date: 'التاريخ',
+                        customerName: 'العميل',
+                        customerId: 'معرّف العميل',
+                        notes: 'ملاحظات'
+                    };
+                    return Object.entries(details || {}).map(([field, change]) =>
+                        `${labels[field] || field}: ${change?.before ?? '—'} ← ${change?.after ?? '—'}`
+                    ).join('\n') || 'لا توجد تفاصيل قيم محفوظة.';
+                },
+
+                getManagerCommissionAlerts() {
+                    return this.managedBranches.flatMap(branch =>
+                        (branch.monitoringAlertHistory || [])
+                            .filter(alert => ['zero_fee', 'commission_mismatch'].includes(alert.type))
+                            .map(alert => ({ ...alert, branchName: branch.name }))
+                    ).sort((left, right) => Number(right.createdAt) - Number(left.createdAt));
+                },
+
+                async reviewManagerLedger(ledgerId, status) {
+                    if (!this.managerSettingsUnlocked || this.managerBusy) return;
+                    const decision = status === 'approved' ? 'اعتماد اقتراح خصم نصف يوم' : 'رفض اقتراح الخصم';
+                    if (!confirm(`هل تؤكد ${decision}؟ لن يتم خصم مبلغ مالي تلقائيًا؛ سيتم تسجيل قرارك في سجل المتابعة.`)) return;
+                    this.managerBusy = true;
+                    this.managerError = '';
+                    try {
+                        await this.firebaseService.reviewManagerLedger(ledgerId, status);
+                        const ledger = this.managerLedgers.find(item => item.id === ledgerId);
+                        if (ledger) {
+                            ledger.status = status;
+                            ledger.reviewedAt = Date.now();
+                        }
+                        this.managerStatus = status === 'approved'
+                            ? 'تم اعتماد الخصم المقترح وتسجيل القرار في سجل الفروع.'
+                            : 'تم رفض اقتراح الخصم وتسجيل القرار.';
+                    } catch (error) {
+                        this.managerError = `تعذرت مراجعة الخصم: ${this.describeFirebaseError(error)}`;
+                    } finally {
+                        this.managerBusy = false;
+                    }
+                },
+
+                openManagerInsightSection(section) {
+                    if (!['overview', 'commissions', 'targets', 'audit', 'closings', 'ledger'].includes(section)) return;
+                    this.managerInsightSection = section;
+                    if (this.managerMonitoringSettings.autoRefreshEnabled
+                        && ['overview', 'closings'].includes(section)) {
+                        this.loadManagerInsights();
+                    }
+                    if (section === 'targets') this.ensureDailyTargetBranches();
+                },
+
+                async saveBranchExperienceSettings() {
+                    if (!this.managerSettingsUnlocked || this.managerBusy || !this.managerMonitoringLoaded) return;
+                    const settings = {
+                        customerNumberDigits: Number(this.managerMonitoringSettings.customerNumberDigits),
+                        rankingVeryClosePercent: Number(this.managerMonitoringSettings.rankingVeryClosePercent),
+                        rankingClosePercent: Number(this.managerMonitoringSettings.rankingClosePercent),
+                        rankingFarPercent: Number(this.managerMonitoringSettings.rankingFarPercent)
+                    };
+                    if (![3, 4].includes(settings.customerNumberDigits)
+                        || !Number.isFinite(settings.rankingVeryClosePercent)
+                        || settings.rankingVeryClosePercent < 0
+                        || !Number.isFinite(settings.rankingClosePercent)
+                        || settings.rankingClosePercent <= settings.rankingVeryClosePercent
+                        || !Number.isFinite(settings.rankingFarPercent)
+                        || settings.rankingFarPercent <= settings.rankingClosePercent
+                        || settings.rankingFarPercent > 100) {
+                        this.managerError = 'نسب الترتيب يجب أن تكون تصاعدية، ونسبة «بعيد جدًا» لا تتجاوز 100٪.';
+                        return;
+                    }
+                    this.managerBusy = true;
+                    this.managerError = '';
+                    this.managerStatus = '';
+                    try {
+                        const saved = await this.firebaseService.saveBranchExperienceSettings(settings);
+                        this.branchExperienceSettings = { ...this.branchExperienceSettings, ...saved };
+                        Object.assign(this.managerMonitoringSettings, saved);
+                        this.managerStatus = 'تم حفظ عدد أرقام العميل ومستويات قرب ترتيب الفروع.';
+                        this.managerNotice = '';
+                        if (this.managerBranchMetrics.length) {
+                            try {
+                                await this.saveManagerBranchPerformanceStatuses();
+                            } catch (error) {
+                                this.managerNotice = 'تم حفظ الإعدادات، لكن تعذر تحديث رسائل الترتيب فورًا.';
+                                this.managerNoticeDetails = this.describeFirebaseError(error);
+                            }
+                        }
+                    } catch (error) {
+                        this.managerError = `تعذر حفظ إعدادات المتابعة: ${this.describeFirebaseError(error)}`;
                     } finally {
                         this.managerBusy = false;
                     }
@@ -2621,6 +3107,7 @@ const APP_TRANSLATIONS = {
                     try {
                         const today = this.getLocalDateString(new Date());
                         const currentMonth = today.slice(0, 7);
+                        const daysElapsed = Math.max(1, Number(today.slice(8, 10)) || 1);
                         const branchesWithSnapshots = await Promise.all(this.managedBranches.map(async branch => ({
                             branch,
                             snapshot: await this.firebaseService.loadBranchSnapshot(branch.id)
@@ -2636,6 +3123,32 @@ const APP_TRANSLATIONS = {
                                 .sort((left, right) => right.getTime() - left.getTime())[0] || null;
                             const totalFees = todayTransactions.reduce((sum, transaction) =>
                                 sum + (Number(transaction.fee) || 0), 0);
+                            const allClosings = snapshot.closingHistory || [];
+                            const latestClosingOverall = [...allClosings].sort((left, right) =>
+                                this.getRecordDateTime(right).localeCompare(this.getRecordDateTime(left))
+                            )[0] || null;
+                            const latestClosingDate = latestClosingOverall
+                                ? new Date(this.getRecordDateTime(latestClosingOverall))
+                                : null;
+                            const currentShiftProfit = todayTransactions
+                                .filter(transaction => {
+                                    if (!latestClosingDate || !Number.isFinite(latestClosingDate.getTime())) return true;
+                                    const transactionDate = this.getRecordDateObject(transaction);
+                                    return transactionDate && transactionDate > latestClosingDate;
+                                })
+                                .reduce((sum, transaction) => sum + (Number(transaction.fee) || 0), 0);
+                            const monthTransactions = allTransactions.filter(transaction =>
+                                this.getRecordDateTime(transaction).slice(0, 7) === currentMonth
+                            );
+                            const monthClosings = allClosings;
+                            const monthClosingRecords = monthClosings.filter(record =>
+                                this.getRecordDateTime(record).slice(0, 7) === currentMonth
+                            );
+                            const monthFees = monthTransactions.reduce((sum, transaction) =>
+                                sum + (Number(transaction.fee) || 0), 0);
+                            const monthMachineProfit = monthClosingRecords.reduce((sum, record) =>
+                                sum + (Number(record.machineProfit) || 0), 0);
+                            const monthProfit = monthFees + monthMachineProfit;
                             const depositVolume = todayTransactions
                                 .filter(transaction => transaction.type === 'deposit')
                                 .reduce((sum, transaction) => sum + (Number(transaction.amount) || 0), 0);
@@ -2655,9 +3168,28 @@ const APP_TRANSLATIONS = {
                                 withdrawVolume,
                                 zeroFeeCount: todayTransactions.filter(transaction => Number(transaction.fee) <= 0).length,
                                 highAmountCount: todayTransactions.filter(transaction => Number(transaction.amount) >= 10000).length,
-                                idleMinutes
+                                idleMinutes,
+                                monthTransactions: monthTransactions.length,
+                                monthFees,
+                                monthProfit,
+                                currentShiftProfit,
+                                averageDailyProfit: monthProfit / daysElapsed,
+                                averageDailyTransactions: monthTransactions.length / daysElapsed,
+                                monthClosingsCount: monthClosingRecords.length,
+                                latestClosing: [...monthClosings].sort((left, right) =>
+                                    this.getRecordDateTime(right).localeCompare(this.getRecordDateTime(left))
+                                )[0] || null
                             };
                         });
+                        this.managerClosingRows = branchesWithSnapshots.flatMap(({ branch, snapshot }) =>
+                            (snapshot.closingHistory || []).map(record => ({
+                                ...record,
+                                branchId: branch.id,
+                                branchName: branch.name
+                            }))
+                        ).sort((left, right) =>
+                            this.getRecordDateTime(right).localeCompare(this.getRecordDateTime(left))
+                        );
                         this.managerLineMetrics = branchesWithSnapshots.flatMap(({ branch, snapshot }) => {
                             const allTransactions = snapshot.transactions || [];
                             return [
@@ -2737,6 +3269,19 @@ const APP_TRANSLATIONS = {
                     const statuses = ranked.map((branch, index) => {
                         const rank = index + 1;
                         const isLast = ranked.length > 1 && rank === ranked.length;
+                        const leaderFees = ranked[0].totalFees;
+                        const profitGap = Math.max(0, leaderFees - branch.totalFees);
+                        const profitGapRatio = leaderFees > 0 ? profitGap / leaderFees * 100 : 0;
+                        const veryClosePercent = Number(this.branchExperienceSettings.rankingVeryClosePercent);
+                        const closePercent = Number(this.branchExperienceSettings.rankingClosePercent);
+                        const farPercent = Number(this.branchExperienceSettings.rankingFarPercent);
+                        const secondPlaceMessage = profitGapRatio <= veryClosePercent
+                            ? 'قربتوا جدًا من الصدارة! كملوا بنفس الحماس.'
+                            : profitGapRatio <= closePercent
+                                ? 'قربتوا من الصدارة، شدوا حيلكم!'
+                                : profitGapRatio <= farPercent
+                                    ? 'لسه بعيدين عن الصدارة شوية؛ كل عملية تقربكم.'
+                                    : 'لسه بعيدين جدًا عن الصدارة؛ زوّدوا نشاطكم وكل عملية هتفرق.';
                         const kind = branch.transactions === 0
                             ? anyBranchHasTransactions ? 'slow' : 'idle'
                             : rank === 1
@@ -2751,19 +3296,45 @@ const APP_TRANSLATIONS = {
                                 : kind === 'slow' ? branch.transactions === 0 ? 'لم يبدأ بعد' : 'محتاج دفعة'
                                     : kind === 'idle' ? 'لم يبدأ بعد'
                                         : `المركز ${rank}`;
-                        const message = kind === 'leader'
-                            ? `إنتوا رقم 1 النهارده بـ${branch.transactions} عملية وعمولات ${this.formatMoney(branch.totalFees)}. كملوا بنفس الحماس!`
+                        const messageOptions = kind === 'leader'
+                            ? [
+                                `إنتوا رقم 1 النهارده بـ${branch.transactions} عملية وعمولات ${this.formatMoney(branch.totalFees)}. عاش، حافظوا على المستوى!`,
+                                `صدارة مستحقة يا أبطال: ${branch.transactions} عملية و${this.formatMoney(branch.totalFees)} عمولات. كملوا بنفس التركيز!`,
+                                `أداء قوي ومركز أول النهارده، عمولاتكم ${this.formatMoney(branch.totalFees)}. شغل محترم، استمروا!`
+                            ]
                             : kind === 'second'
-                                ? ranked[0].totalFees > branch.totalFees
-                                    ? `إنتوا في المركز التاني، ناقصكم ${this.formatMoney(ranked[0].totalFees - branch.totalFees)} ج عمولات عشان توصلوا للصدارة. عدد العمليات بيحسم الترتيب لو الأرباح اتعادلت.`
-                                    : `إنتوا متعادلين في الأرباح مع المركز الأول؛ ${Math.max(0, ranked[0].transactions - branch.transactions)} عملية إضافية تحسم الصدارة.`
+                                ? [
+                                    `إنتوا في المركز التاني. ${secondPlaceMessage}`,
+                                    `المركز التاني قريب من الصدارة؛ ${secondPlaceMessage}`,
+                                    `أداء كويس يا فريق، فاضلكم شوية على المركز الأول. ${secondPlaceMessage}`
+                                ]
                                 : kind === 'slow'
                                     ? branch.transactions === 0
-                                        ? 'لسه مفيش ولا عملية النهارده. ابدأوا الشغل وإن شاء الله تلحقوا باقي الفروع!'
-                                        : `إنتوا آخر الترتيب دلوقتي بعمولات ${this.formatMoney(branch.totalFees)}. زوّدوا الأرباح، وعدد العمليات بيحسم الترتيب لو الأرباح اتعادلت.`
+                                        ? [
+                                            'لسه مفيش عملية اتسجلت النهارده. ابدأوا أول عملية وخلّونا نشوف شغل يفرّح!',
+                                            'النشاط هادي لحد دلوقتي؛ اطمنوا إن كل حاجة جاهزة وابدأوا التسجيل.',
+                                            'مستنيين بداية شغلكم النهارده. افتحوا التسجيل وابدأوا خطوة بخطوة.'
+                                        ]
+                                        : [
+                                            `ترتيبكم محتاج يتحسن: ${branch.transactions} عملية لحد دلوقتي. زوّدوا النشاط وراجعوا جودة تسجيل كل عملية.`,
+                                            `لسه ورا الفرع اللي قبلكم بعمولات ${this.formatMoney(Math.max(0, leaderFees - branch.totalFees))} ج. شدوا حيلكم وسجلوا الشغل أول بأول.`,
+                                            'تقدروا تطلعوا في الترتيب؛ ركزوا على عمليات بعمولتها الصح وكملوا تسجيل الشيفت.'
+                                        ]
                                     : kind === 'idle'
-                                        ? 'لسه مفيش عمليات متسجلة للفرع النهارده.'
-                                        : `إنتوا في المركز ${rank} بعمولات ${this.formatMoney(branch.totalFees)} النهارده.`;
+                                        ? [
+                                            'لسه مفيش عمليات متسجلة للفرع النهارده. ابدأوا التسجيل أول ما الشغل يبدأ.',
+                                            'متابعة الفرع شايفة النشاط هادي؛ راجعوا الاتصال وسجلوا الشغل أول بأول.',
+                                            'مفيش عمليات ظاهرة لحد دلوقتي. لو فيه عطل بلغوا المدير، ولو الشغل بدأ سجلوا العمليات.'
+                                        ]
+                                        : [
+                                            `إنتوا في المركز ${rank} بـ${branch.transactions} عملية النهارده. كملوا تسجيل كل عملية بعمولتها الصحيحة.`,
+                                            `مركزكم الحالي ${rank}، وعدد العمليات ${branch.transactions}. شغل ثابت، حافظوا على الدقة.`,
+                                            `أداء الفرع مستقر: ${branch.transactions} عملية ومركز ${rank}. كل عملية صحيحة بتفرق.`
+                                        ];
+                        const messageSeed = `${businessDate}:${branch.id}:${branch.transactions}:${branch.totalFees}:${rank}`;
+                        const messageIndex = Array.from(messageSeed).reduce((sum, character) =>
+                            sum + character.charCodeAt(0), 0) % messageOptions.length;
+                        const message = messageOptions[messageIndex];
                         return {
                             branch,
                             status: {
@@ -3261,6 +3832,10 @@ const APP_TRANSLATIONS = {
                 stopManagedBranchWatchers() {
                     this.managedBranchUnsubscribers.forEach(unsubscribe => unsubscribe());
                     this.managedBranchUnsubscribers = [];
+                    if (this.managerInsightsTimer) {
+                        window.clearInterval(this.managerInsightsTimer);
+                        this.managerInsightsTimer = null;
+                    }
                 },
 
                 async createBranchFromManager() {
@@ -3362,8 +3937,6 @@ const APP_TRANSLATIONS = {
                 async openManagedBranch(branch) {
                     if (!this.managerSettingsUnlocked || !branch.account?.active || this.firebaseBusy) return;
                     this.stopManagedBranchWatchers();
-                    if (this.managerInsightsTimer) window.clearInterval(this.managerInsightsTimer);
-                    this.managerInsightsTimer = null;
                     this.firebaseBusy = true;
                     this.firebaseAuthError = '';
                     this.selectedBranchId = branch.id;
@@ -3398,8 +3971,6 @@ const APP_TRANSLATIONS = {
                     this.currentMode = 'admin';
                     this.adminTab = 'branches';
                     this.managerAdminPage = 'branches';
-                    if (this.managerInsightsTimer) window.clearInterval(this.managerInsightsTimer);
-                    this.managerInsightsTimer = null;
                     try {
                         await this.loadManagedBranches();
                     } catch (error) {
@@ -3526,8 +4097,35 @@ const APP_TRANSLATIONS = {
                         : String(record?.datetime || '—');
                 },
 
+                formatCustomerStatementDateTime(date) {
+                    if (!(date instanceof Date) || !Number.isFinite(date.getTime())) return '—';
+                    return date.toLocaleString('en-US-u-nu-latn', {
+                        timeZone: 'Africa/Cairo',
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        hour12: true
+                    });
+                },
+
+                getCustomerStatementDisplayDateTime(record) {
+                    const date = this.getRecordDateObject(record);
+                    return date
+                        ? this.formatCustomerStatementDateTime(date)
+                        : this.toLatinDigits(record?.datetime || '—');
+                },
+
+                toLatinDigits(value) {
+                    return String(value ?? '').replace(/[٠-٩۰-۹]/g, digit => {
+                        const code = digit.charCodeAt(0);
+                        return String(code - (code >= 0x06f0 ? 0x06f0 : 0x0660));
+                    });
+                },
+
                 getDateTimeLocale() {
-                    return this.language === 'en' ? 'en-US' : 'ar-EG-u-nu-latn';
+                    return 'en-US-u-nu-latn';
                 },
 
                 getLocalDateTimeInput(record) {
@@ -3614,16 +4212,56 @@ const APP_TRANSLATIONS = {
                     return this.customers.filter(c => c.balance < 0);
                 },
 
+                get filteredDebtors() {
+                    const query = this.debtorSearch.trim().toLocaleLowerCase();
+                    if (!query) return this.debtorsList;
+                    return this.debtorsList.filter(customer =>
+                        (customer.name || '').toLocaleLowerCase().includes(query) ||
+                        String(customer.phone || '').toLocaleLowerCase().includes(query)
+                    );
+                },
+
+                get filteredCreditors() {
+                    const query = this.creditorSearch.trim().toLocaleLowerCase();
+                    if (!query) return this.creditorsList;
+                    return this.creditorsList.filter(customer =>
+                        (customer.name || '').toLocaleLowerCase().includes(query) ||
+                        String(customer.phone || '').toLocaleLowerCase().includes(query)
+                    );
+                },
+
+                get customerDebtSummary() {
+                    return this.customers.reduce((summary, customer) => {
+                        const balance = Number(customer.balance || 0);
+                        if (balance > 0) {
+                            summary.debtorsCount += 1;
+                            summary.debtorsTotal += balance;
+                        } else if (balance < 0) {
+                            summary.creditorsCount += 1;
+                            summary.creditorsTotal += Math.abs(balance);
+                        }
+                        return summary;
+                    }, { debtorsCount: 0, debtorsTotal: 0, creditorsCount: 0, creditorsTotal: 0 });
+                },
+
+                get filteredDebtorsTotal() {
+                    return this.filteredDebtors.reduce((total, customer) => total + Number(customer.balance || 0), 0);
+                },
+
+                get filteredCreditorsTotal() {
+                    return this.filteredCreditors.reduce((total, customer) => total + Math.abs(Number(customer.balance || 0)), 0);
+                },
+
                 get walletReportTransactions() {
                     const { walletId, fromDate, toDate, lastThree } = this.walletReportFilter;
-                    const targetLastThree = String(lastThree || '').replace(/\D/g, '').slice(-3);
+                    const targetLastThree = this.normalizeCustomerNumberDigits(lastThree);
                     return this.transactions.filter(t => {
                         const date = this.getRecordDateTime(t).slice(0, 10);
-                        const transactionLastThree = String(t.lastThree || '').replace(/\D/g, '').slice(-3);
+                        const transactionLastThree = String(t.lastThree || '').replace(/\D/g, '');
                         return (!walletId || t.walletId === walletId)
                             && (!fromDate || date >= fromDate)
                             && (!toDate || date <= toDate)
-                            && (!targetLastThree || transactionLastThree === targetLastThree);
+                            && (!targetLastThree || transactionLastThree.endsWith(targetLastThree));
                     }).sort((a, b) => this.compareRecordsNewestFirst(a, b));
                 },
 
@@ -3811,7 +4449,7 @@ const APP_TRANSLATIONS = {
 
                 formatMoney(amount) {
                     if (amount === null || amount === undefined || isNaN(amount)) return '0.00';
-                    return Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    return Number(amount).toLocaleString('en-US', { numberingSystem: 'latn', minimumFractionDigits: 2, maximumFractionDigits: 2 });
                 },
 
                 // FIRESTORE PERSISTENCE & MANUAL DATA EXPORT
@@ -4296,23 +4934,35 @@ const APP_TRANSLATIONS = {
 
                 calculateDepositFee() {
                     this.cashierDeposit.fee = this.calculateTransactionFee('deposit', this.cashierDeposit.amount);
+                    this.cashierDeposit.feeEdited = false;
                 },
 
                 calculateWithdrawFee() {
                     this.cashierWithdraw.fee = this.calculateTransactionFee('withdraw', this.cashierWithdraw.amount);
+                    this.cashierWithdraw.feeEdited = false;
                 },
 
                 calculateTransactionFee(type, amount) {
                     const value = Number(amount);
                     if (!Number.isFinite(value) || value <= 0) return null;
-                    if (type === 'deposit') {
-                        return Math.max(0, Math.ceil(value / 1000) * 5 - 1);
-                    }
-                    return Math.ceil(value / 500) * 5;
+                    if (!['deposit', 'withdraw'].includes(type)) return null;
+                    const tiers = [...this.commissionRules.tiers]
+                        .sort((left, right) => Number(left.minAmount) - Number(right.minAmount));
+                    const eligibleTiers = tiers.filter(item => Number(item.minAmount) <= value);
+                    const tier = eligibleTiers[eligibleTiers.length - 1];
+                    if (!tier) return null;
+                    const lastTier = tiers[tiers.length - 1];
+                    const stepsBeyondLastTier = value > Number(lastTier.minAmount)
+                        ? Math.floor((value - Number(lastTier.minAmount)) / Number(this.commissionRules.incrementAmount))
+                        : 0;
+                    return Number(tier.fee) + stepsBeyondLastTier * Number(this.commissionRules.incrementFee);
                 },
 
                 async executeTransaction(type) {
                     if (!this.appOnline) return alert('لا يوجد اتصال بالإنترنت. أوقفنا تسجيل العمليات مؤقتًا لحماية البيانات.');
+                    if (!this.commissionRulesReady) {
+                        return alert(`جدول العمولات غير متاح؛ لم يتم تسجيل العملية. ${this.commissionRulesError}`);
+                    }
                     if (this.cashierSaveInProgress) return;
                     if (this.pendingCashierTransaction && this.pendingCashierTransaction.type !== type) {
                         return alert('هناك عملية لم يتم تأكيد حفظها. أعد محاولة حفظها أولاً قبل تسجيل عملية أخرى.');
@@ -4368,7 +5018,7 @@ const APP_TRANSLATIONS = {
                                 ? Number(form.fee || 0)
                                 : Number(this.calculateTransactionFee(type, form.amount) || 0),
                             customerName: form.customerName || '',
-                            lastThree: form.lastThree || ''
+                            lastThree: this.normalizeCustomerNumberDigits(form.lastThree)
                         };
 
                         this.transactions.unshift(tx);
@@ -4427,6 +5077,14 @@ const APP_TRANSLATIONS = {
                     return type === 'deposit' ? -Number(amount || 0) : Number(amount || 0);
                 },
 
+                normalizeCustomerNumberDigits(value) {
+                    const digits = String(value || '').replace(/\D/g, '');
+                    const limit = [3, 4].includes(Number(this.branchExperienceSettings.customerNumberDigits))
+                        ? Number(this.branchExperienceSettings.customerNumberDigits)
+                        : 4;
+                    return digits.slice(-limit);
+                },
+
                 saveTransactionEdit() {
                     const transaction = this.editingTransactionRecord;
                     if (!transaction || !this.transactionForm.walletId || Number(this.transactionForm.amount) <= 0) return alert('راجع بيانات العملية');
@@ -4444,6 +5102,7 @@ const APP_TRANSLATIONS = {
                     Object.assign(transaction, {
                         ...this.transactionForm,
                         amount: Number(this.transactionForm.amount),
+                        lastThree: this.normalizeCustomerNumberDigits(this.transactionForm.lastThree),
                         fee: this.canEditTransactionCommission
                             ? Number(this.transactionForm.fee || 0)
                             : Number(transaction.fee || 0),
@@ -4761,6 +5420,103 @@ const APP_TRANSLATIONS = {
                     this.saveAllData();
                 },
 
+                get closingDraftsEnabled() {
+                    return this.closingDraftSettingReady
+                        && this.managerMonitoringSettings.closingDraftsEnabled !== false;
+                },
+
+                getClosingDraftStorageKey(branchId = this.dataOwnerBranchId) {
+                    return branchId ? `sama-closing-draft:${branchId}` : '';
+                },
+
+                saveClosingDraft() {
+                    if (!this.closingDraftsEnabled || !this.currentBranch?.id) return;
+                    const key = this.getClosingDraftStorageKey(this.currentBranch.id);
+                    if (!key) return;
+                    const draft = {
+                        version: 1,
+                        savedAt: Date.now(),
+                        masterOpeningBalance: this.masterOpeningBalance,
+                        closingInputs: {
+                            actualDrawerCash: this.closingInputs.actualDrawerCash,
+                            walletBalances: { ...this.closingInputs.walletBalances },
+                            machineProfit: this.closingInputs.machineProfit
+                        }
+                    };
+                    try {
+                        localStorage.setItem(key, JSON.stringify(draft));
+                        this.closingDraftStatus = 'تم حفظ مدخلات التقفيل على هذا الجهاز.';
+                        this.closingDraftError = '';
+                    } catch (error) {
+                        this.closingDraftError = 'تعذر حفظ مدخلات التقفيل محليًا. تأكد من إتاحة مساحة تخزين للمتصفح.';
+                        console.error('Closing inputs could not be saved to local storage:', error);
+                    }
+                },
+
+                restoreClosingDraft() {
+                    if (!this.closingDraftsEnabled || !this.currentBranch?.id) return false;
+                    const key = this.getClosingDraftStorageKey(this.currentBranch.id);
+                    if (!key) return false;
+                    try {
+                        const rawDraft = localStorage.getItem(key);
+                        if (!rawDraft) return false;
+                        const draft = JSON.parse(rawDraft);
+                        if (draft?.version !== 1 || !draft.closingInputs || typeof draft.closingInputs !== 'object') {
+                            throw new Error('صيغة مسودة التقفيل المحفوظة غير صالحة.');
+                        }
+                        const walletBalances = draft.closingInputs.walletBalances;
+                        if (!walletBalances || typeof walletBalances !== 'object' || Array.isArray(walletBalances)) {
+                            throw new Error('أرصدة المحافظ في مسودة التقفيل غير صالحة.');
+                        }
+                        this.masterOpeningBalance = draft.masterOpeningBalance ?? this.masterOpeningBalance;
+                        this.closingInputs = {
+                            ...this.closingInputs,
+                            actualDrawerCash: draft.closingInputs.actualDrawerCash ?? null,
+                            walletBalances: { ...walletBalances },
+                            machineProfit: draft.closingInputs.machineProfit ?? ''
+                        };
+                        this.closingDraftStatus = 'تم استعادة مسودة التقفيل المحفوظة على هذا الجهاز.';
+                        this.closingDraftError = '';
+                        return true;
+                    } catch (error) {
+                        this.closingDraftError = `تعذر استعادة مسودة التقفيل المحفوظة: ${error.message}`;
+                        console.error('Closing inputs could not be restored from local storage:', error);
+                        return false;
+                    }
+                },
+
+                removeClosingDraft() {
+                    const key = this.getClosingDraftStorageKey(this.currentBranch?.id);
+                    if (!key) return false;
+                    try {
+                        localStorage.removeItem(key);
+                        this.closingDraftStatus = 'تم مسح مسودة التقفيل المحفوظة من هذا الجهاز.';
+                        this.closingDraftError = '';
+                        return true;
+                    } catch (error) {
+                        this.closingDraftError = 'تعذر مسح مسودة التقفيل من التخزين المحلي.';
+                        console.error('Closing draft could not be removed from local storage:', error);
+                        return false;
+                    }
+                },
+
+                clearClosingDraft() {
+                    const key = this.getClosingDraftStorageKey(this.currentBranch?.id);
+                    if (!key) return;
+                    try {
+                        if (localStorage.getItem(key) === null) {
+                            this.closingDraftStatus = 'لا توجد مسودة محفوظة لهذا الفرع على هذا الجهاز.';
+                            return;
+                        }
+                    } catch (error) {
+                        this.closingDraftError = 'تعذر قراءة مسودة التقفيل من التخزين المحلي.';
+                        console.error('Closing draft could not be checked before removal:', error);
+                        return;
+                    }
+                    if (!confirm('مسح مسودة التقفيل المحفوظة لهذا الفرع من هذا الجهاز؟')) return;
+                    this.removeClosingDraft();
+                },
+
                 calculateFullAudit() {
                     const expectedDrawer = this.calculateExpectedDrawerCash();
                     const parsedDrawer = this.parseClosingExpression(this.closingInputs.actualDrawerCash);
@@ -4890,6 +5646,7 @@ const APP_TRANSLATIONS = {
                     this.closingInputs.actualDrawerCash = null;
                     this.closingInputs.walletBalances = {};
                     this.closingInputs.machineProfit = '';
+                    this.removeClosingDraft();
                     this.selectedClosingReportId = closingRecord.id;
                     alert('تم اعتماد وتقفيل الشيفت بنجاح!');
                 },
@@ -5029,6 +5786,24 @@ const APP_TRANSLATIONS = {
                 },
 
                 // VOUCHERS CRUD
+                getVoucherBalancePreview() {
+                    const customer = this.customers.find(item => item.id === this.voucherForm.customerId);
+                    if (!customer) return null;
+
+                    let currentBalance = Number(customer.balance || 0);
+                    const existing = this.vouchers.find(voucher => voucher.id === this.editingVoucherId);
+                    if (existing && existing.customerId === customer.id) {
+                        currentBalance -= (existing.type === 'payment' ? 1 : -1) * Number(existing.amount || 0);
+                    }
+
+                    const amount = Number(this.voucherForm.amount || 0);
+                    const voucherEffect = this.voucherForm.type === 'payment'
+                        ? amount
+                        : this.voucherForm.type === 'receipt' ? -amount : 0;
+
+                    return { current: currentBalance, projected: currentBalance + voucherEffect };
+                },
+
                 saveVoucher() {
                     if (!['receipt', 'payment'].includes(this.voucherForm.type)) return alert('اختر نوع السند');
                     if (!this.voucherForm.customerId) return alert('اختر العميل إجبارياً');
@@ -5119,6 +5894,56 @@ const APP_TRANSLATIONS = {
                     return { receipts, payments };
                 },
 
+                get voucherReportRows() {
+                    const { mode, customerId, fromDate, toDate } = this.voucherReportFilter;
+                    return this.vouchers
+                        .filter(voucher => {
+                            if (customerId && voucher.customerId !== customerId) return false;
+                            const date = this.getRecordDateTime(voucher).slice(0, 10);
+                            if (mode === 'today') return date === this.getLocalDateString();
+                            if (mode === 'period') return date >= fromDate && date <= toDate;
+                            return false;
+                        })
+                        .sort((a, b) => this.compareRecordsNewestFirst(a, b));
+                },
+
+                getFilteredVoucherReportCustomers() {
+                    const query = this.voucherReportCustomerSearch.trim().toLocaleLowerCase();
+                    if (!query) return this.customers;
+                    return this.customers.filter(customer =>
+                        (customer.name || '').toLocaleLowerCase().includes(query) ||
+                        String(customer.phone || '').toLocaleLowerCase().includes(query)
+                    );
+                },
+
+                selectVoucherReportCustomer(customer) {
+                    this.voucherReportFilter.customerId = customer.id;
+                    this.voucherReportCustomerSearch = `${customer.name} (${customer.phone || ''})`;
+                    this.voucherReportCustomerDropdownOpen = false;
+                },
+
+                clearVoucherReportCustomer() {
+                    this.voucherReportFilter.customerId = '';
+                    this.voucherReportCustomerSearch = '';
+                    this.voucherReportCustomerDropdownOpen = false;
+                },
+
+                get voucherReportTotals() {
+                    return this.voucherReportRows.reduce((totals, voucher) => {
+                        totals.count += 1;
+                        if (voucher.type === 'receipt') totals.receipts += Number(voucher.amount || 0);
+                        else if (voucher.type === 'payment') totals.payments += Number(voucher.amount || 0);
+                        return totals;
+                    }, { count: 0, receipts: 0, payments: 0 });
+                },
+
+                openVoucherReport() {
+                    const { mode, customerId, fromDate, toDate } = this.voucherReportFilter;
+                    if (mode === 'period' && (!fromDate || !toDate)) return alert('حدد تاريخ البداية والنهاية.');
+                    if (mode === 'period' && fromDate > toDate) return alert('تاريخ البداية يجب أن يكون قبل تاريخ النهاية.');
+                    this.showVoucherReportModal = true;
+                },
+
                 get filteredVouchers() {
                     if (!this.voucherSearch) return [...this.vouchers].sort((a, b) => this.compareRecordsNewestFirst(a, b));
                     const q = this.voucherSearch.toLowerCase();
@@ -5206,7 +6031,74 @@ const APP_TRANSLATIONS = {
                     this.selectedCustomerVouchers = this.vouchers
                         .filter(v => v.customerId === c.id)
                         .sort((a, b) => this.compareRecordsNewestFirst(a, b));
+                    this.customerStatementFilter = { search: '', fromDate: '', toDate: '' };
                     this.showStatementModal = true;
+                },
+
+                printCustomerStatement() {
+                    document.body.classList.add('statement-print-mode');
+                    window.addEventListener('afterprint', () => {
+                        document.body.classList.remove('statement-print-mode');
+                    }, { once: true });
+                    window.print();
+                },
+
+                get customerStatementOpeningBalance() {
+                    const voucherImpact = this.selectedCustomerVouchers.reduce((total, voucher) => {
+                        const amount = Number(voucher.amount || 0);
+                        if (voucher.type === 'payment') return total + amount;
+                        if (voucher.type === 'receipt') return total - amount;
+                        return total;
+                    }, 0);
+                    return Number(this.selectedCustomer.balance || 0) - voucherImpact;
+                },
+
+                get customerStatementAllRows() {
+                    let balance = this.customerStatementOpeningBalance;
+                    return [...this.selectedCustomerVouchers]
+                        .sort((a, b) => this.compareRecordsNewestFirst(b, a))
+                        .map(voucher => {
+                            const amount = Number(voucher.amount || 0);
+                            if (voucher.type === 'payment') balance += amount;
+                            else if (voucher.type === 'receipt') balance -= amount;
+                            return { voucher, balanceAfter: balance };
+                        });
+                },
+
+                get customerStatementStartBalance() {
+                    const { fromDate } = this.customerStatementFilter;
+                    if (!fromDate) return this.customerStatementOpeningBalance;
+                    const priorRows = this.customerStatementAllRows.filter(({ voucher }) =>
+                        this.getRecordDateTime(voucher).slice(0, 10) < fromDate
+                    );
+                    return priorRows.length
+                        ? priorRows[priorRows.length - 1].balanceAfter
+                        : this.customerStatementOpeningBalance;
+                },
+
+                get customerStatementRows() {
+                    const { search, fromDate, toDate } = this.customerStatementFilter;
+                    const query = this.toLatinDigits(search).trim().toLocaleLowerCase();
+                    return this.customerStatementAllRows.filter(({ voucher }) => {
+                        const date = this.getRecordDateTime(voucher).slice(0, 10);
+                        if (fromDate && date < fromDate) return false;
+                        if (toDate && date > toDate) return false;
+                        if (!query) return true;
+                        return [
+                            this.toLatinDigits(voucher.notes),
+                            voucher.type === 'payment' ? 'سند صرف' : 'سند قبض',
+                            voucher.amount
+                        ].some(value => this.toLatinDigits(value).toLocaleLowerCase().includes(query));
+                    });
+                },
+
+                get customerStatementTotals() {
+                    return this.customerStatementRows.reduce((totals, { voucher }) => {
+                        totals.count += 1;
+                        if (voucher.type === 'payment') totals.payments += Number(voucher.amount || 0);
+                        else if (voucher.type === 'receipt') totals.receipts += Number(voucher.amount || 0);
+                        return totals;
+                    }, { count: 0, payments: 0, receipts: 0 });
                 },
 
                 // REPORTS

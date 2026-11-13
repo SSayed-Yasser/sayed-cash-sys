@@ -4,7 +4,6 @@ import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { onDocumentCreated, onDocumentUpdated } from "firebase-functions/v2/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
-import { onSchedule } from "firebase-functions/v2/scheduler";
 
 initializeApp();
 
@@ -12,6 +11,41 @@ const adminAuth = getAuth();
 const database = getFirestore(getApp(), "default");
 const managerAuthEmail = "sayedyassersy1@gmail.com";
 const monitoringSettingsRef = database.doc("systemSettings/monitoring");
+const commissionRulesRef = database.doc("systemSettings/commissionRules");
+const dailyTargetsRef = database.doc("systemSettings/dailyTargets");
+const defaultCommissionRules = {
+    tiers: [
+        { minAmount: 0, fee: 5 },
+        { minAmount: 600, fee: 10 },
+        { minAmount: 1091, fee: 15 },
+        { minAmount: 1591, fee: 20 },
+        { minAmount: 2091, fee: 25 },
+        { minAmount: 2591, fee: 30 }
+    ],
+    incrementAmount: 500,
+    incrementFee: 5
+};
+const defaultBranchExperienceSettings = {
+    customerNumberDigits: 4,
+    rankingVeryClosePercent: 5,
+    rankingClosePercent: 20,
+    rankingFarPercent: 50
+};
+
+async function loadBranchExperienceSettings() {
+    const snapshot = await database.doc("systemSettings/branchExperience").get();
+    const settings = { ...defaultBranchExperienceSettings, ...(snapshot.data() || {}) };
+    const valid = [3, 4].includes(Number(settings.customerNumberDigits))
+        && Number.isFinite(Number(settings.rankingVeryClosePercent))
+        && Number(settings.rankingVeryClosePercent) >= 0
+        && Number.isFinite(Number(settings.rankingClosePercent))
+        && Number(settings.rankingClosePercent) > Number(settings.rankingVeryClosePercent)
+        && Number.isFinite(Number(settings.rankingFarPercent))
+        && Number(settings.rankingFarPercent) > Number(settings.rankingClosePercent)
+        && Number(settings.rankingFarPercent) <= 100;
+    if (!valid) throw new Error("إعدادات متابعة الفروع غير صالحة.");
+    return settings;
+}
 
 function requireSystemAdmin(request) {
     const email = String(request.auth?.token?.email || "").toLowerCase();
@@ -193,6 +227,9 @@ export const notifyManagerOfBranchActivity = onDocumentCreated({
         `القسم: ${activity.collection || "غير معروف"}`,
         `السجل: ${activity.recordId || "—"}`,
         `جلسة الجهاز: ${activity.deviceId || "غير معروف"}`,
+        ...Object.entries(activity.details || {}).map(([field, change]) =>
+            `${field}: ${change?.before ?? "—"} ← ${change?.after ?? "—"}`
+        ),
         `رقم المتابعة: ${event.params.logId}`
     ];
     const subjectBranch = String(activity.branchName || event.params.branchId).replace(/[\r\n]+/g, " ").slice(0, 100);
@@ -205,6 +242,30 @@ export const notifyManagerOfBranchActivity = onDocumentCreated({
         id: `activity-${createHash("sha256").update(event.params.logId).digest("hex")}`,
         category: "activity"
     });
+
+    if (["transactions", "vouchers"].includes(activity.collection)
+        && ["updated", "deleted"].includes(activity.action)) {
+        const changeSummary = Object.entries(activity.details || {})
+            .map(([field, change]) => `${field}: ${change?.before ?? "—"} ← ${change?.after ?? "—"}`)
+            .join("؛ ");
+        const activityName = activity.collection === "transactions" ? "عملية مالية" : "سند";
+        const message = activity.action === "deleted"
+            ? `تم حذف ${activityName} من الفرع. راجعوا سبب الحذف مع المدير قبل متابعة الشغل. ${changeSummary}`
+            : `تم تعديل ${activityName} في الفرع. التعديل مسجل للمراجعة؛ اتأكدوا إن البيانات والعمولة مطابقة. ${changeSummary}`;
+        await database.collection("branches").doc(event.params.branchId)
+            .collection("settings").doc("communications").set({
+                assistantNotice: {
+                    id: `audit-${event.params.logId}`,
+                    type: "record_audit",
+                    severity: "warning",
+                    message,
+                    createdAt: Date.now(),
+                    reminderCount: 0,
+                    lastReminderAt: Date.now()
+                },
+                assistantNoticeRead: null
+            }, { merge: true });
+    }
 });
 
 const hourMilliseconds = 60 * 60 * 1000;
@@ -235,7 +296,7 @@ function getCairoDateKey(date) {
 }
 
 function formatCurrency(value) {
-    return `${new Intl.NumberFormat("ar-EG", { maximumFractionDigits: 2 }).format(value)} ج`;
+    return `${new Intl.NumberFormat("en-US-u-nu-latn", { maximumFractionDigits: 2 }).format(value)} ج`;
 }
 
 async function loadBranchMonitoringMetrics(branch, now) {
@@ -340,7 +401,7 @@ async function loadBranchMonitoringMetrics(branch, now) {
     };
 }
 
-function getBranchPerformanceStatus(metrics, ranking, totalBranches, now) {
+function getBranchPerformanceStatus(metrics, ranking, totalBranches, now, experienceSettings) {
     const rank = ranking.findIndex(item => item.branchId === metrics.branchId) + 1;
     const anyBranchHasTransactions = ranking[0]?.transactions > 0;
     const isLast = rank > 0 && ranking.length > 1 && rank === ranking.length;
@@ -359,20 +420,61 @@ function getBranchPerformanceStatus(metrics, ranking, totalBranches, now) {
                 : kind === "idle" ? "لم يبدأ بعد"
                     : `المركز ${rank}`;
     const leader = ranking[0];
-    const message = kind === "leader"
-        ? `إنتوا رقم 1 النهارده بـ${metrics.transactions} عملية وعمولات ${formatCurrency(metrics.totalFees)}. كملوا بنفس الحماس!`
+    const profitGap = Math.max(0, (leader?.totalFees || 0) - metrics.totalFees);
+    const profitGapRatio = leader?.totalFees > 0 ? profitGap / leader.totalFees * 100 : 0;
+    const secondPlaceMessage = profitGapRatio <= experienceSettings.rankingVeryClosePercent
+        ? "قربتوا جدًا من الصدارة! كملوا بنفس الحماس."
+        : profitGapRatio <= experienceSettings.rankingClosePercent
+            ? "قربتوا من الصدارة، شدوا حيلكم!"
+            : profitGapRatio <= experienceSettings.rankingFarPercent
+                ? "لسه بعيدين عن الصدارة شوية؛ كل عملية تقربكم."
+                : "لسه بعيدين جدًا عن الصدارة؛ زوّدوا نشاطكم وكل عملية هتفرق.";
+    const businessDate = getCairoDateKey(now);
+    const messageOptions = kind === "leader"
+        ? [
+            `إنتوا رقم 1 النهارده بـ${metrics.transactions} عملية وعمولات ${formatCurrency(metrics.totalFees)}. عاش، حافظوا على المستوى!`,
+            `صدارة مستحقة يا أبطال: ${metrics.transactions} عملية و${formatCurrency(metrics.totalFees)} عمولات. كملوا بنفس التركيز!`,
+            `أداء قوي ومركز أول النهارده، عمولاتكم ${formatCurrency(metrics.totalFees)}. شغل محترم، استمروا!`
+        ]
         : kind === "second"
-            ? `إنتوا في المركز التاني، ناقصكم ${Math.max(0, leader.transactions - metrics.transactions)} عملية وتوصلوا للصدارة. شدوا حيلكم!`
+            ? [
+                `إنتوا في المركز التاني. ${secondPlaceMessage}`,
+                `المركز التاني قريب من الصدارة؛ ${secondPlaceMessage}`,
+                `أداء كويس يا فريق، فاضلكم شوية على المركز الأول. ${secondPlaceMessage}`
+            ]
             : kind === "slow"
                 ? metrics.transactions === 0
-                    ? "لسه مفيش ولا عملية النهارده. ابدأوا الشغل وإن شاء الله تلحقوا باقي الفروع!"
-                    : `إنتوا آخر الترتيب دلوقتي بـ${metrics.transactions} عملية. كل عملية هتقرّبكم من الفرع اللي قبلكم.`
+                    ? [
+                        "لسه مفيش عملية اتسجلت النهارده. ابدأوا أول عملية وخلّونا نشوف شغل يفرّح!",
+                        "النشاط هادي لحد دلوقتي؛ اطمنوا إن كل حاجة جاهزة وابدأوا التسجيل.",
+                        "مستنيين بداية شغلكم النهارده. افتحوا التسجيل وابدأوا خطوة بخطوة."
+                    ]
+                    : [
+                        `ترتيبكم محتاج يتحسن: ${metrics.transactions} عملية لحد دلوقتي. زوّدوا النشاط وراجعوا جودة تسجيل كل عملية.`,
+                        `لسه ورا الفرع اللي قبلكم بـ${metrics.transactions} عملية مسجلة. شدوا حيلكم وسجلوا الشغل أول بأول.`,
+                        `تقدروا تطلعوا في الترتيب؛ ركزوا على عمليات بعمولتها الصح وكملوا تسجيل الشيفت.`
+                    ]
                 : kind === "idle"
                     ? metrics.activeDevices > 0
-                        ? "لسه مفيش عمليات النهارده مع إن جهاز الفرع متصل. اطمنوا إن الشغل ماشي."
-                        : "لسه مفيش عمليات متسجلة للفرع النهارده."
-                    : `إنتوا في المركز ${rank} بـ${metrics.transactions} عملية النهارده.`;
-    const businessDate = getCairoDateKey(now);
+                        ? [
+                            "الجهاز متصل ومفيش عمليات مسجلة لحد دلوقتي. راجعوا إن الشغل ماشي وسجلوا كل عملية في وقتها.",
+                            "لسه مفيش حركة ظاهرة رغم اتصال الجهاز. لو فيه عطل بلغوا المدير، ولو الشغل بدأ سجلوا العمليات.",
+                            "متابعة الفرع شايفة الجهاز متصل لكن مفيش تسجيل. اتأكدوا من سير الشغل وحدثوا البيانات."
+                        ]
+                        : [
+                            "لسه مفيش نشاط أو جهاز متصل للفرع. راجعوا الاتصال وابدأوا التسجيل أول ما الشغل يبدأ.",
+                            "مش ظاهر اتصال أو عمليات للفرع حاليًا. اتأكدوا من الإنترنت والجهاز قبل بداية الشيفت.",
+                            "مفيش نشاط واصل من الفرع لحد دلوقتي. راجعوا الاتصال وسجلوا أي مشكلة تشغيل."
+                        ]
+                    : [
+                        `إنتوا في المركز ${rank} بـ${metrics.transactions} عملية النهارده. كملوا تسجيل كل عملية بعمولتها الصحيحة.`,
+                        `مركزكم الحالي ${rank}، وعدد العمليات ${metrics.transactions}. شغل ثابت، حافظوا على الدقة.`,
+                        `أداء الفرع مستقر: ${metrics.transactions} عملية ومركز ${rank}. كل عملية صحيحة بتفرق.`
+                    ];
+    const messageSeed = `${businessDate}:${metrics.branchId}:${metrics.transactions}:${metrics.totalFees}:${rank}`;
+    const messageIndex = Array.from(messageSeed).reduce((sum, character) =>
+        sum + character.charCodeAt(0), 0) % messageOptions.length;
+    const message = messageOptions[messageIndex];
     return {
         eventId: `${businessDate}:${kind}:${rank}:${metrics.transactions}:${metrics.totalFees}`,
         date: businessDate,
@@ -490,7 +592,14 @@ async function recordBranchMonitoringAlerts(
                 severity: alert.severity,
                 message: alert.message,
                 createdAt: now.getTime(),
-                fingerprint: alert.fingerprint
+                fingerprint: alert.fingerprint,
+                transactionId: alert.transactionId || null,
+                transactionType: alert.transactionType || null,
+                amount: alert.amount ?? null,
+                actualFee: alert.actualFee ?? null,
+                expectedFee: alert.expectedFee ?? null,
+                previousFee: alert.previousFee ?? null,
+                direction: alert.direction || null
             });
         });
         if (communicationsRef && (newAlerts.length || forceNotice)) {
@@ -521,26 +630,44 @@ async function recordBranchMonitoringAlerts(
     });
 }
 
-function getExpectedTransactionFee(transaction) {
+function getExpectedTransactionFee(transaction, rules = defaultCommissionRules) {
     const amount = Number(transaction.amount);
     if (!Number.isFinite(amount) || amount <= 0) return null;
-    if (transaction.type === "deposit") return Math.max(0, Math.ceil(amount / 1000) * 5 - 1);
-    if (transaction.type === "withdraw") return Math.ceil(amount / 500) * 5;
-    return null;
+    if (!["deposit", "withdraw"].includes(transaction.type)) return null;
+    const tiers = (Array.isArray(rules.tiers) ? rules.tiers : defaultCommissionRules.tiers)
+        .slice()
+        .sort((left, right) => Number(left.minAmount) - Number(right.minAmount));
+    const incrementAmount = Math.max(1, Number(rules.incrementAmount) || 500);
+    const incrementFee = Math.max(0, Number(rules.incrementFee) || 0);
+    const eligibleTiers = tiers.filter(item => Number(item.minAmount) <= amount);
+    const tier = eligibleTiers[eligibleTiers.length - 1];
+    if (!tier) return null;
+    const lastTier = tiers[tiers.length - 1];
+    const stepsBeyondLastTier = amount > Number(lastTier?.minAmount)
+        ? Math.floor((amount - Number(lastTier.minAmount)) / incrementAmount)
+        : 0;
+    const baseFee = Number(tier.fee) || 0;
+    return Math.max(0, baseFee + stepsBeyondLastTier * incrementFee);
 }
 
 async function monitorBranchTransaction(branchId, transactionId, transaction, previousTransaction = null) {
-    const settingsSnapshot = await monitoringSettingsRef.get();
+    const [settingsSnapshot, commissionRulesSnapshot] = await Promise.all([
+        monitoringSettingsRef.get(),
+        commissionRulesRef.get()
+    ]);
     const settings = {
         outboundEnabled: true,
         cashierInteractionEnabled: true,
         ...(settingsSnapshot.data() || {})
     };
-    if (settings.outboundEnabled !== true) return;
+    const now = new Date();
+    if (settings.outboundEnabled !== true) {
+        await recordDailyTargetAchievement(branchId, now);
+        return;
+    }
 
     const amount = Number(transaction.amount);
     const transactionDate = parseRecordDate(transaction.datetime);
-    const now = new Date();
     if (!transactionDate || !Number.isFinite(amount) || amount <= 0
         || transactionDate.getTime() > now.getTime() + 5 * 60 * 1000) return;
 
@@ -554,30 +681,44 @@ async function monitorBranchTransaction(branchId, transactionId, transaction, pr
     ]);
     const branchName = branchSnapshot.data()?.name || branchId;
     const alerts = [];
-    const expectedFee = getExpectedTransactionFee(transaction);
+    const commissionRules = commissionRulesSnapshot.exists()
+        ? commissionRulesSnapshot.data()
+        : defaultCommissionRules;
+    const expectedFee = getExpectedTransactionFee(transaction, commissionRules);
     const actualFee = Number(transaction.fee) || 0;
-    const feeChanged = previousTransaction
-        && (Number(previousTransaction.fee) || 0) !== actualFee;
-    const transactionIsRecent = now.getTime() - transactionDate.getTime() <= 15 * 60 * 1000;
+    const transactionChanged = previousTransaction && [
+        "amount", "fee", "type", "walletId", "datetime"
+    ].some(field => previousTransaction[field] !== transaction[field]);
+    const shouldCheckCommission = !previousTransaction || transactionChanged;
 
-    if (actualFee <= 0 && (transactionIsRecent || feeChanged)) {
+    if (actualFee <= 0 && shouldCheckCommission) {
         alerts.push({
             type: "zero_fee",
             severity: "warning",
-            fingerprint: `zero_fee:${transactionId}`,
-            message: `مراجعة عمولة: عملية ${transaction.type === "deposit" ? "إيداع" : "سحب"} بمبلغ ${formatCurrency(amount)} اتسجلت من غير عمولة.`
+            fingerprint: `zero_fee:${transactionId}:${amount}:${transaction.type}`,
+            transactionId,
+            transactionType: transaction.type,
+            amount,
+            actualFee,
+            expectedFee,
+            message: `تنبيه عمولة: العملية ${transaction.type === "deposit" ? "إيداع" : "سحب"} بمبلغ ${formatCurrency(amount)} اتسجلت بعمولة صفر بدل ${formatCurrency(expectedFee)}. راجعوا العملية وسجلوا السبب.`
         });
     } else if (expectedFee !== null
-        && (feeChanged || (transactionIsRecent && Math.abs(actualFee - expectedFee) > 0.001))) {
-        const previousFee = previousTransaction ? Number(previousTransaction.fee) || 0 : null;
-        const changeDetails = previousFee === null
-            ? `المسجل ${formatCurrency(actualFee)} والمتوقع ${formatCurrency(expectedFee)}`
-            : `اتغيرت من ${formatCurrency(previousFee)} لـ ${formatCurrency(actualFee)}؛ والمتوقع ${formatCurrency(expectedFee)}`;
+        && shouldCheckCommission
+        && Math.abs(actualFee - expectedFee) > 0.001) {
+        const direction = actualFee > expectedFee ? "زيادة" : "نقص";
         alerts.push({
-            type: "commission_adjustment",
+            type: "commission_mismatch",
             severity: "warning",
-            fingerprint: `commission:${transactionId}:${previousFee ?? "new"}:${actualFee}:${Number(transaction.amount)}:${transaction.type}`,
-            message: `مراجعة عمولة: ${changeDetails} في عملية ${transaction.type === "deposit" ? "إيداع" : "سحب"} بمبلغ ${formatCurrency(amount)}.`
+            fingerprint: `commission_mismatch:${transactionId}:${amount}:${actualFee}:${expectedFee}:${transaction.type}`,
+            transactionId,
+            transactionType: transaction.type,
+            amount,
+            actualFee,
+            expectedFee,
+            previousFee: previousTransaction ? Number(previousTransaction.fee) || 0 : null,
+            direction,
+            message: `مراجعة عمولة: ${direction} عن الجدول في عملية ${transaction.type === "deposit" ? "إيداع" : "سحب"} بمبلغ ${formatCurrency(amount)}؛ الصحيح ${formatCurrency(expectedFee)} والمسجل ${formatCurrency(actualFee)}.`
         });
     }
     if (transactionIsRecent && amount >= 10000) {
@@ -679,6 +820,174 @@ async function monitorBranchTransaction(branchId, transactionId, transaction, pr
             now
         );
     }
+    if (alerts.some(alert => ["zero_fee", "commission_mismatch"].includes(alert.type))) {
+        await createSameDayDeductionProposal(branchId, branchName, transactionId, now);
+    }
+    await recordDailyTargetAchievement(branchId, now);
+}
+
+async function getSameDayCommissionViolations(branchId, now) {
+    const businessDate = getCairoDateKey(now);
+    const alertsCollection = database.collection("branches").doc(branchId).collection("monitoringAlerts");
+    const recentAlerts = await alertsCollection
+        .where("createdAt", ">=", now.getTime() - 48 * hourMilliseconds)
+        .get();
+    const matchingAlerts = recentAlerts.docs
+        .map(document => ({ id: document.id, ...document.data() }))
+        .filter(alert => ["zero_fee", "commission_mismatch"].includes(alert.type)
+            && alert.transactionId
+            && getCairoDateKey(new Date(Number(alert.createdAt))) === businessDate);
+    return {
+        businessDate,
+        count: new Set(matchingAlerts.map(alert => alert.transactionId)).size,
+        alerts: matchingAlerts
+    };
+}
+
+async function createSameDayDeductionProposal(branchId, branchName, transactionId, now) {
+    const violations = await getSameDayCommissionViolations(branchId, now);
+    if (!violations.count) return;
+    const message = violations.count >= 3
+        ? `دي المخالفة رقم ${violations.count} النهارده. اتسجل اقتراح خصم نصف يوم للمراجعة؛ مفيش خصم هيتنفذ قبل اعتماد المدير.`
+        : violations.count === 2
+            ? "دي تاني مخالفة عمولة النهارده. راجعوا جدول العمولة قبل تسجيل العملية الجاية."
+            : "دي أول مخالفة عمولة النهارده. راجعوا الجدول وسجلوا العمولة الصحيحة في العمليات الجاية.";
+    await database.collection("branches").doc(branchId).collection("settings").doc("communications").set({
+        assistantNotice: {
+            id: `commission-review-${violations.businessDate}-${violations.count}-${transactionId}`,
+            type: "commission_mismatch",
+            severity: violations.count >= 3 ? "urgent" : "warning",
+            message,
+            createdAt: now.getTime(),
+            reminderCount: 0,
+            lastReminderAt: now.getTime()
+        },
+        assistantNoticeRead: null
+    }, { merge: true });
+    if (violations.count < 3) return;
+
+    const ledgerId = `deduction_${branchId}_${violations.businessDate}`;
+    const ledgerReference = database.collection("managerLedgers").doc(ledgerId);
+    const shouldNotify = await database.runTransaction(async transaction => {
+        const existing = await transaction.get(ledgerReference);
+        if (!existing.exists) {
+            transaction.create(ledgerReference, {
+                type: "deduction",
+                branchId,
+                branchName,
+                date: violations.businessDate,
+                status: "pending",
+                proposedUnits: 0.5,
+                proposedLabel: "خصم نصف يوم",
+                strikeCount: violations.count,
+                sourceTransactionIds: [...new Set(violations.alerts.map(alert => alert.transactionId))],
+                sourceAlertIds: violations.alerts.map(alert => alert.id),
+                notificationSent: false,
+                createdAt: now.getTime()
+            });
+        }
+        return existing.data()?.notificationSent !== true;
+    });
+    if (shouldNotify) {
+        const text = `${branchName}: تم تسجيل اقتراح خصم نصف يوم بعد ${violations.count} مخالفات عمولة في نفس اليوم. الاقتراح معلق حتى مراجعته واعتماده في صفحة الخصومات والمكافآت.`;
+        await saveManagerEmail("[سما فون] اقتراح خصم للمراجعة", text, `<p dir="rtl">${escapeHtml(text)}</p>`, {
+            id: `deduction-${createHash("sha256").update(ledgerId).digest("hex")}`,
+            category: "alert"
+        });
+        await ledgerReference.update({ notificationSent: true });
+    }
+}
+
+async function recordDailyTargetAchievement(branchId, now, completedShiftProfit = null) {
+    const targetsSnapshot = await dailyTargetsRef.get();
+    const targets = targetsSnapshot.data();
+    const businessDate = getCairoDateKey(now);
+    if (!targets || targets.enabled !== true || targets.date !== businessDate) return;
+    const branchTarget = targets.branches?.[branchId] || {};
+    if (branchTarget.enabled === false) return;
+    const targetProfit = Number(branchTarget.targetProfit ?? targets.targetProfit);
+    const rewardAmount = Number(branchTarget.rewardAmount ?? targets.rewardAmount);
+    if (!Number.isFinite(targetProfit) || targetProfit <= 0
+        || !Number.isFinite(rewardAmount) || rewardAmount < 0) return;
+
+    const branchReference = database.collection("branches").doc(branchId);
+    const transactionsCollection = branchReference.collection("data").doc("transactions").collection("items");
+    const closingCollection = branchReference.collection("data").doc("closingHistory").collection("items");
+    const recentWindow = new Date(now.getTime() - 48 * hourMilliseconds);
+    const [stringTransactions, timestampTransactions, latestClosing, branchSnapshot] = await Promise.all([
+        transactionsCollection.where("datetime", ">=", recentWindow.toISOString()).get(),
+        transactionsCollection.where("datetime", ">=", recentWindow).get(),
+        closingCollection.orderBy("datetime", "desc").limit(1).get(),
+        branchReference.get()
+    ]);
+    const transactions = new Map();
+    [...stringTransactions.docs, ...timestampTransactions.docs].forEach(document =>
+        transactions.set(document.id, document.data())
+    );
+    const lastClosingDate = latestClosing.empty
+        ? null
+        : parseRecordDate(latestClosing.docs[0].data().datetime);
+    const currentShiftFees = Array.from(transactions.values()).reduce((sum, item) => {
+        const date = parseRecordDate(item.datetime);
+        return date && getCairoDateKey(date) === businessDate
+            && (!lastClosingDate || date.getTime() > lastClosingDate.getTime())
+            ? sum + (Number(item.fee) || 0)
+            : sum;
+    }, 0);
+    const measuredProfit = completedShiftProfit !== null
+        && completedShiftProfit !== undefined
+        && Number.isFinite(Number(completedShiftProfit))
+        ? Number(completedShiftProfit)
+        : currentShiftFees;
+    if (measuredProfit < targetProfit) return;
+
+    const branchName = branchSnapshot.data()?.name || branchId;
+    const ledgerId = `bonus_${branchId}_${businessDate}`;
+    const ledgerReference = database.collection("managerLedgers").doc(ledgerId);
+    const shouldNotify = await database.runTransaction(async transaction => {
+        const existing = await transaction.get(ledgerReference);
+        if (!existing.exists) {
+            transaction.create(ledgerReference, {
+                type: "bonus",
+                branchId,
+                branchName,
+                date: businessDate,
+                status: "recorded",
+                targetProfit,
+                actualProfit: measuredProfit,
+                rewardAmount,
+                notificationSent: false,
+                createdAt: now.getTime()
+            });
+        }
+        return existing.data()?.notificationSent !== true;
+    });
+    if (!shouldNotify) return;
+
+    const praiseMessages = [
+        `مبروك يا ${branchName}! حققتوا هدف الشيفت ووصل ربحكم ${formatCurrency(measuredProfit)}. مكافأتكم ${formatCurrency(rewardAmount)} اتسجلت. شغل محترم، كملوا بنفس الروح!`,
+        `إنجاز الشيفت اتسجل يا ${branchName}: ربح ${formatCurrency(measuredProfit)} ومكافأة ${formatCurrency(rewardAmount)}. تعبكم جاب نتيجة، عاش!`,
+        `${branchName} وصل لهدف الشيفت! الربح عدى ${formatCurrency(targetProfit)}، ومكافأة ${formatCurrency(rewardAmount)} اتضافت لسجل الفروع. تستاهلوا، كملوا!`
+    ];
+    const messageIndex = Number(businessDate.slice(-2)) % praiseMessages.length;
+    const praise = praiseMessages[messageIndex];
+    await branchReference.collection("settings").doc("communications").set({
+        assistantNotice: {
+            id: `daily-goal-${businessDate}`,
+            type: "goal_achieved",
+            severity: "success",
+            message: praise,
+            createdAt: now.getTime(),
+            reminderCount: 0,
+            lastReminderAt: now.getTime()
+        },
+        assistantNoticeRead: null
+    }, { merge: true });
+    await saveManagerEmail("[سما فون] فرع حقق هدفه اليومي", praise, `<p dir="rtl">${escapeHtml(praise)}</p>`, {
+        id: `goal-${createHash("sha256").update(ledgerId).digest("hex")}`,
+        category: "alert"
+    });
+    await ledgerReference.update({ notificationSent: true });
 }
 
 async function updateBranchAssistantNotice(metrics, candidate, settings, now) {
@@ -767,51 +1076,6 @@ async function updateBranchAssistantNotice(metrics, candidate, settings, now) {
     return null;
 }
 
-async function updateManagerIdleNotification(metrics, candidate, now) {
-    if (candidate?.type !== "idle") return null;
-    const alertId = createHash("sha256")
-        .update(`${metrics.branchId}:${candidate.fingerprint}`)
-        .digest("hex");
-    const alertReference = database.collection("branches").doc(metrics.branchId)
-        .collection("monitoringAlerts").doc(alertId);
-    const snapshot = await alertReference.get();
-    const existing = snapshot.data() || {};
-    if (!snapshot.exists) {
-        await alertReference.set({
-            id: alertId,
-            branchId: metrics.branchId,
-            branchName: metrics.name,
-            type: candidate.type,
-            severity: candidate.severity,
-            message: candidate.message,
-            createdAt: now.getTime(),
-            fingerprint: candidate.fingerprint,
-            managerNotificationCount: 0,
-            lastManagerNotificationAt: null
-        });
-    } else if (existing.severity !== candidate.severity || existing.message !== candidate.message) {
-        await alertReference.set({
-            severity: candidate.severity,
-            message: candidate.message
-        }, { merge: true });
-    }
-
-    const lastNotifiedAt = Number(
-        existing.lastManagerNotificationAt || existing.emailLoggedAt || existing.emailSentAt
-    ) || 0;
-    if (lastNotifiedAt && now.getTime() - lastNotifiedAt < noticeReminderMilliseconds) return null;
-    return {
-        type: "idle",
-        branchId: metrics.branchId,
-        branchName: metrics.name,
-        message: candidate.message,
-        idleMinutes: metrics.idleMinutes,
-        severity: candidate.severity,
-        alertId,
-        notificationNumber: (Number(existing.managerNotificationCount) || 0) + 1
-    };
-}
-
 export const monitorBranchTransactionCreated = onDocumentCreated({
     database: "default",
     document: "branches/{branchId}/data/transactions/items/{transactionId}",
@@ -838,6 +1102,18 @@ export const monitorBranchTransactionUpdated = onDocumentUpdated({
     );
 });
 
+export const monitorBranchClosingCreated = onDocumentCreated({
+    database: "default",
+    document: "branches/{branchId}/data/closingHistory/items/{closingId}",
+    retry: true
+}, async event => {
+    await recordDailyTargetAchievement(
+        event.params.branchId,
+        new Date(),
+        Number(event.data?.data()?.profit)
+    );
+});
+
 function buildManagerReport(metrics, now) {
     const ranked = [...metrics].sort((left, right) =>
         right.transactions - left.transactions || right.totalFees - left.totalFees
@@ -850,7 +1126,7 @@ function buildManagerReport(metrics, now) {
         return `${index + 1}. ${item.name}: ${item.transactions} عملية اليوم، عمولات ${formatCurrency(item.totalFees)}، إيداع ${formatCurrency(item.depositVolume)}، سحب ${formatCurrency(item.withdrawVolume)}، عمليات دون عمولة آخر 24 ساعة: ${item.zeroFeeCount}، عمليات مرتفعة (10,000 ج أو أكثر): ${item.highAmountCount}، ${idle}، أجهزة نشطة: ${item.activeDevices}. الخطوط: ${lines}.`;
     });
     const text = [
-        `تقرير Sama Phone — ${now.toLocaleString("ar-EG", { timeZone: "Africa/Cairo" })}`,
+        `تقرير Sama Phone — ${now.toLocaleString("en-US-u-nu-latn", { timeZone: "Africa/Cairo" })}`,
         "ترتيب الفروع حسب عدد عمليات اليوم ثم العمولات:",
         ...(rows.length ? rows : ["لا توجد فروع نشطة حاليًا."])
     ].join("\n\n");
@@ -861,7 +1137,7 @@ function buildManagerReport(metrics, now) {
         const idle = item.idleMinutes === null ? "لا توجد عملية مسجلة" : `آخر عملية منذ ${item.idleMinutes} دقيقة`;
         return `<tr><td>${index + 1}. ${escapeHtml(item.name)}</td><td>${item.transactions}</td><td>${escapeHtml(formatCurrency(item.totalFees))}</td><td>${escapeHtml(formatCurrency(item.depositVolume))}</td><td>${escapeHtml(formatCurrency(item.withdrawVolume))}</td><td>${item.zeroFeeCount}</td><td>${item.highAmountCount}</td><td>${escapeHtml(idle)}</td><td>${escapeHtml(lineInfo)}</td></tr>`;
     }).join("");
-    const html = `<div dir="rtl"><h2>تقرير Sama Phone — ${escapeHtml(now.toLocaleString("ar-EG", { timeZone: "Africa/Cairo" }))}</h2><p>ترتيب الفروع حسب عدد عمليات اليوم ثم العمولات.</p><table border="1" cellpadding="8" cellspacing="0"><thead><tr><th>الترتيب والفرع</th><th>عمليات اليوم</th><th>العمولات</th><th>الإيداع</th><th>السحب</th><th>دون عمولة (24 ساعة)</th><th>مبالغ مرتفعة</th><th>آخر نشاط</th><th>الخطوط المثبتة وأرصدتها</th></tr></thead><tbody>${htmlRows}</tbody></table><p>تُحسب مبالغ العمليات المرتفعة ابتداءً من 10,000 ج. لا ينفذ النظام أي خصم تلقائي.</p></div>`;
+    const html = `<div dir="rtl"><h2>تقرير Sama Phone — ${escapeHtml(now.toLocaleString("en-US-u-nu-latn", { timeZone: "Africa/Cairo" }))}</h2><p>ترتيب الفروع حسب عدد عمليات اليوم ثم العمولات.</p><table border="1" cellpadding="8" cellspacing="0"><thead><tr><th>الترتيب والفرع</th><th>عمليات اليوم</th><th>العمولات</th><th>الإيداع</th><th>السحب</th><th>دون عمولة (24 ساعة)</th><th>مبالغ مرتفعة</th><th>آخر نشاط</th><th>الخطوط المثبتة وأرصدتها</th></tr></thead><tbody>${htmlRows}</tbody></table><p>تُحسب مبالغ العمليات المرتفعة ابتداءً من 10,000 ج. لا ينفذ النظام أي خصم تلقائي.</p></div>`;
     return { text, html };
 }
 
@@ -894,10 +1170,10 @@ async function saveManagerEmail(subject, text, _html, options = {}) {
 async function savePendingMonitoringAlert(alerts, now) {
     if (!alerts.length) return 0;
     const text = [
-        `تنبيهات متابعة الفروع — ${now.toLocaleString("ar-EG", { timeZone: "Africa/Cairo" })}`,
+        `تنبيهات متابعة الفروع — ${now.toLocaleString("en-US-u-nu-latn", { timeZone: "Africa/Cairo" })}`,
         ...alerts.map(alert => `${alert.branchName}: ${alert.message}`)
     ].join("\n\n");
-    const html = `<div dir="rtl"><h2>تنبيهات متابعة الفروع</h2><p>${escapeHtml(now.toLocaleString("ar-EG", { timeZone: "Africa/Cairo" }))}</p><ul>${alerts.map(alert => `<li><strong>${escapeHtml(alert.branchName)}</strong>: ${escapeHtml(alert.message)}</li>`).join("")}</ul></div>`;
+    const html = `<div dir="rtl"><h2>تنبيهات متابعة الفروع</h2><p>${escapeHtml(now.toLocaleString("en-US-u-nu-latn", { timeZone: "Africa/Cairo" }))}</p><ul>${alerts.map(alert => `<li><strong>${escapeHtml(alert.branchName)}</strong>: ${escapeHtml(alert.message)}</li>`).join("")}</ul></div>`;
     const emailId = `alerts-${createHash("sha256")
         .update(alerts.map(alert => alert.id).sort().join(":"))
         .digest("hex")}`;
@@ -1041,12 +1317,15 @@ export const runManagerMonitoringNow = onCall({
         () => monitoringSettingsRef.get()
     );
     const settings = {
-        reportsEnabled: true,
         outboundEnabled: true,
         cashierInteractionEnabled: true,
         remindersEnabled: true,
         ...(settingsSnapshot.data() || {})
     };
+    const branchExperienceSettings = await runManagerMonitoringStage(
+        "تحميل إعدادات ترتيب الفروع",
+        () => loadBranchExperienceSettings()
+    );
     const branchesSnapshot = await runManagerMonitoringStage(
         "تحميل قائمة الفروع",
         () => database.collection("branches").get()
@@ -1065,7 +1344,7 @@ export const runManagerMonitoringNow = onCall({
     );
     const performances = new Map(metrics.map(item => [
         item.branchId,
-        getBranchPerformanceStatus(item, ranking, metrics.length, now)
+        getBranchPerformanceStatus(item, ranking, metrics.length, now, branchExperienceSettings)
     ]));
     await runManagerMonitoringStage("حفظ ترتيب الفروع", () =>
         Promise.all(metrics.map(async item => {
@@ -1145,7 +1424,7 @@ export const sendManagerEmailTest = onCall({
 }, async request => {
     requireSystemAdmin(request);
     const now = new Date();
-    const savedAtLabel = now.toLocaleString("ar-EG", { timeZone: "Africa/Cairo" });
+    const savedAtLabel = now.toLocaleString("en-US-u-nu-latn", { timeZone: "Africa/Cairo" });
     let email;
     try {
         email = await saveManagerEmail(
@@ -1167,167 +1446,4 @@ export const sendManagerEmailTest = onCall({
         recipient: "البريد الداخلي للنظام",
         savedAt: email.savedAt || now.getTime()
     };
-});
-
-export const runScheduledBranchMonitoring = onSchedule({
-    schedule: "every 15 minutes",
-    timeZone: "Africa/Cairo",
-    timeoutSeconds: 300,
-    maxInstances: 1
-}, async () => {
-    const now = new Date();
-    const branchesSnapshot = await database.collection("branches").get();
-    const activeBranches = branchesSnapshot.docs
-        .map(document => ({ id: document.id, ...document.data() }))
-        .filter(branch => branch.active !== false);
-    const metrics = await Promise.all(activeBranches.map(branch => loadBranchMonitoringMetrics(branch, now)));
-    const ranking = [...metrics].sort((left, right) =>
-        right.transactions - left.transactions
-        || right.totalFees - left.totalFees
-        || left.name.localeCompare(right.name)
-    );
-    const performanceStatuses = new Map(metrics.map(item => [
-        item.branchId,
-        getBranchPerformanceStatus(item, ranking, metrics.length, now)
-    ]));
-    await Promise.all(metrics.map(async item => {
-        const communicationsRef = database.collection("branches").doc(item.branchId)
-            .collection("settings").doc("communications");
-        const snapshot = await communicationsRef.get();
-        const existingStatus = snapshot.data()?.performanceStatus;
-        const nextStatus = performanceStatuses.get(item.branchId);
-        if (existingStatus?.eventId === nextStatus?.eventId
-            && existingStatus?.transactions === nextStatus?.transactions
-            && existingStatus?.fees === nextStatus?.fees
-            && existingStatus?.message === nextStatus?.message) return;
-        await communicationsRef.set({ performanceStatus: nextStatus }, { merge: true });
-    }));
-    const escalations = [];
-
-    const latestSettingsSnapshot = await monitoringSettingsRef.get();
-    const latestSettings = {
-        reportsEnabled: true,
-        outboundEnabled: true,
-        cashierInteractionEnabled: true,
-        remindersEnabled: true,
-        ...(latestSettingsSnapshot.data() || {})
-    };
-    if (latestSettings.outboundEnabled !== true) return;
-
-    for (const branchMetrics of metrics) {
-        const candidate = getMonitoringNotice(
-            branchMetrics,
-            performanceStatuses.get(branchMetrics.branchId),
-            now
-        );
-        if (latestSettings.cashierInteractionEnabled === true) {
-            const escalation = await updateBranchAssistantNotice(branchMetrics, candidate, latestSettings, now);
-            if (escalation) escalations.push(escalation);
-        }
-        if (latestSettings.remindersEnabled === true) {
-            const idleNotification = await updateManagerIdleNotification(branchMetrics, candidate, now);
-            if (idleNotification) escalations.push(idleNotification);
-        }
-    }
-    const idleEscalations = escalations.filter(item => item.type === "idle");
-    const otherEscalations = escalations.filter(item => item.type !== "idle");
-
-    const emailSettingsSnapshot = await monitoringSettingsRef.get();
-    const emailSettings = {
-        reportsEnabled: true,
-        outboundEnabled: true,
-        remindersEnabled: true,
-        ...(emailSettingsSnapshot.data() || {})
-    };
-    if (emailSettings.outboundEnabled === true && emailSettings.reportsEnabled === true && otherEscalations.length) {
-        const text = otherEscalations
-            .map(item => `${item.branchName}: لم يؤكد الفرع استلام التنبيه بعد تذكيرين.\n${item.message}`)
-            .join("\n\n");
-        const html = `<div dir="rtl"><h2>متابعة مطلوبة من المدير</h2>${otherEscalations.map(item => `<p><strong>${escapeHtml(item.branchName)}</strong>: لم يؤكد الفرع استلام التنبيه بعد تذكيرين.<br>${escapeHtml(item.message)}</p>`).join("")}</div>`;
-        try {
-            await saveManagerEmail("[Sama Phone] متابعة فروع تتطلب مراجعتك", text, html);
-            await Promise.all(otherEscalations.map(item => database.collection("branches").doc(item.branchId)
-                .collection("settings").doc("communications")
-                .update({ "assistantNotice.managerNotifiedAt": now.getTime() })));
-        } catch (error) {
-            console.error("Manager escalation email failed.", {
-                errorCode: error?.code || "mailbox_save_failed"
-            });
-        }
-    }
-
-    if (emailSettings.outboundEnabled === true
-        && emailSettings.remindersEnabled === true
-        && idleEscalations.length) {
-        await Promise.all(idleEscalations.map(async item => {
-            const severityLabel = item.severity === "critical"
-                ? "تصعيد حرج"
-                : item.severity === "urgent"
-                    ? "تحذير عاجل"
-                    : "تنبيه";
-            const subject = `[سما فون] ${severityLabel}: لا توجد عمليات في ${item.branchName}`;
-            const text = [
-                `الفرع: ${item.branchName}`,
-                `مدة التوقف: ${item.idleMinutes} دقيقة دون تسجيل عملية`,
-                `الحالة: ${severityLabel}`,
-                item.message,
-                "يرجى الاتصال بالفرع ومراجعة سبب التوقف."
-            ].join("\n\n");
-            const html = `<div dir="rtl"><h2>${escapeHtml(severityLabel)}</h2><p><strong>الفرع:</strong> ${escapeHtml(item.branchName)}</p><p><strong>مدة التوقف:</strong> ${item.idleMinutes} دقيقة دون تسجيل عملية</p><p>${escapeHtml(item.message)}</p><p>يرجى الاتصال بالفرع ومراجعة سبب التوقف.</p></div>`;
-            const emailId = `idle-${createHash("sha256")
-                .update(`${item.branchId}:${item.alertId}:${item.notificationNumber}`)
-                .digest("hex")}`;
-            try {
-                await saveManagerEmail(subject, text, html, {
-                    id: emailId,
-                    category: "idle_alert"
-                });
-                await database.collection("branches").doc(item.branchId)
-                    .collection("monitoringAlerts").doc(item.alertId)
-                    .update({
-                        lastManagerNotificationAt: now.getTime(),
-                        managerNotificationCount: item.notificationNumber,
-                        emailLoggedAt: now.getTime()
-                    });
-            } catch (error) {
-                console.error("Idle branch manager notification failed.", {
-                    branchId: item.branchId,
-                    alertId: item.alertId,
-                    emailId,
-                    errorCode: error?.code || "mailbox_save_failed"
-                });
-            }
-        }));
-    }
-
-    if (emailSettings.reportsEnabled !== true) return;
-    const previousReportAt = Number(emailSettings.lastReportAt) || 0;
-    const inFlightAt = Number(emailSettings.reportInFlightAt) || 0;
-    if (now.getTime() - previousReportAt < hourMilliseconds
-        || (inFlightAt && now.getTime() - inFlightAt < 10 * 60 * 1000)) return;
-
-    const claimed = await database.runTransaction(async transaction => {
-        const currentSnapshot = await transaction.get(monitoringSettingsRef);
-        const current = currentSnapshot.data() || {};
-        const lastSent = Number(current.lastReportAt) || 0;
-        const currentClaim = Number(current.reportInFlightAt) || 0;
-        if (current.outboundEnabled !== true || current.reportsEnabled !== true
-            || now.getTime() - lastSent < hourMilliseconds
-            || (currentClaim && now.getTime() - currentClaim < 10 * 60 * 1000)) return false;
-        transaction.set(monitoringSettingsRef, { reportInFlightAt: now.getTime() }, { merge: true });
-        return true;
-    });
-    if (!claimed) return;
-
-    try {
-        const report = buildManagerReport(metrics, now);
-        await saveManagerEmail("[Sama Phone] تقرير متابعة الفروع كل ساعة", report.text, report.html);
-        await monitoringSettingsRef.set({
-            lastReportAt: now.getTime(),
-            reportInFlightAt: null
-        }, { merge: true });
-    } catch (error) {
-        await monitoringSettingsRef.set({ reportInFlightAt: null }, { merge: true });
-        throw error;
-    }
 });

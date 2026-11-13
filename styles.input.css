@@ -43,6 +43,27 @@ body { font-family: 'Cairo', sans-serif; }
             .cashier-limit-separator { margin-right: 7px; margin-left: 7px; }
         }
         [x-cloak] { display: none !important; }
+        .closing-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+        .closing-top-card, .closing-assets-row, .closing-cash-column, .closing-cash-panel, .closing-machine-panel, .closing-insta-panel, .closing-lines-panel, .closing-report-panel { min-width: 0; }
+        .voucher-panel-enter { animation: voucher-panel-enter .38s cubic-bezier(.2, .75, .25, 1) both; }
+        @keyframes voucher-panel-enter {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .voucher-panel-enter { animation: none; }
+        }
+        .closing-summary-cards { grid-template-columns: minmax(0, 1fr); }
+        .closing-audit-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        @media (min-width: 640px) {
+            .closing-summary-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+        @media (min-width: 1280px) {
+            .closing-summary-cards { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+            .closing-assets-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+            .closing-cash-column { display: grid; gap: 1rem; }
+            .closing-audit-summary { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        }
         input[type="number"] {
             appearance: textfield;
             -moz-appearance: textfield;

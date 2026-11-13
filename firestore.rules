@@ -162,5 +162,34 @@ service cloud.firestore {
     match /systemSettings/{settingId} {
       allow read, write: if isSystemAdmin();
     }
+
+    match /systemSettings/branchExperience {
+      allow get: if signedIn();
+      allow write: if isSystemAdmin();
+    }
+
+    match /systemSettings/commissionRules {
+      allow get: if signedIn();
+      allow write: if isSystemAdmin();
+    }
+
+    match /systemSettings/dailyTargets {
+      allow get: if signedIn();
+      allow write: if isSystemAdmin();
+    }
+
+    match /systemSettings/closingDrafts {
+      allow get: if signedIn();
+      allow create, update: if isSystemAdmin()
+        && request.resource.data.keys().hasOnly(['enabled', 'updatedAt'])
+        && request.resource.data.enabled is bool
+        && request.resource.data.updatedAt is int;
+      allow delete: if isSystemAdmin();
+    }
+
+    match /managerLedgers/{ledgerId} {
+      allow read, create, update: if isSystemAdmin();
+      allow delete: if false;
+    }
   }
 }

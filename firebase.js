@@ -48,13 +48,42 @@ const database = getFirestore(app, "default");
 const collectionNames = ["wallets", "transactions", "vouchers", "customers", "closingHistory"];
 const userCaches = new Map();
 const pendingWrites = new Map();
+const branchDeviceHeartbeatInterval = 5 * 60 * 1000;
+const branchDeviceOnlineWindow = 11 * 60 * 1000;
+const pendingWriteStoragePrefix = "sama-phone-pending-write";
+const serverTimestampMarker = "__samaPhoneServerTimestamp__";
 const managerEmail = "sayedyassersy1@gmail.com";
 const defaultManagerMonitoringSettings = {
-    reportsEnabled: true,
     outboundEnabled: true,
     cashierInteractionEnabled: true,
     remindersEnabled: true,
-    refreshIntervalMinutes: 15
+    autoRefreshEnabled: false,
+    refreshIntervalMinutes: 60
+};
+const defaultBranchExperienceSettings = {
+    customerNumberDigits: 4,
+    rankingVeryClosePercent: 5,
+    rankingClosePercent: 20,
+    rankingFarPercent: 50
+};
+const defaultCommissionRules = {
+    tiers: [
+        { minAmount: 0, fee: 5 },
+        { minAmount: 600, fee: 10 },
+        { minAmount: 1091, fee: 15 },
+        { minAmount: 1591, fee: 20 },
+        { minAmount: 2091, fee: 25 },
+        { minAmount: 2591, fee: 30 }
+    ],
+    incrementAmount: 500,
+    incrementFee: 5
+};
+const defaultDailyTargets = {
+    date: "",
+    enabled: false,
+    targetProfit: 4000,
+    rewardAmount: 100,
+    branches: {}
 };
 
 isSupported()
@@ -383,6 +412,29 @@ function watchBranchMonitoringAlerts(branchId, maxEntries, onChange, onError) {
     );
 }
 
+function getRecentBranchMonitoringAlerts(branchId, maxEntries = 5) {
+    const alertsQuery = query(
+        collection(database, "branches", branchId, "monitoringAlerts"),
+        orderBy("createdAt", "desc"),
+        limit(maxEntries)
+    );
+    return getDocs(alertsQuery).then(snapshot =>
+        snapshot.docs.map(item => ({ id: item.id, ...item.data() }))
+    );
+}
+
+function getRecentManagerEmails(maxEntries = 100) {
+    const emailsQuery = query(
+        collection(database, "managerEmails"),
+        orderBy("createdAt", "desc"),
+        limit(maxEntries)
+    );
+    return getDocs(emailsQuery).then(snapshot => snapshot.docs.map(item => ({
+        id: item.id,
+        ...item.data()
+    })));
+}
+
 function watchManagerEmails(maxEntries, onChange, onError) {
     const emailsQuery = query(
         collection(database, "managerEmails"),
@@ -415,6 +467,21 @@ function watchBranchCommunication(branchId, onChange, onError) {
     );
 }
 
+function getBranchDeviceList(branchId) {
+    return getDocs(collection(database, "branchPresence", branchId, "devices"))
+        .then(snapshot => {
+            const cutoff = Date.now() - branchDeviceOnlineWindow;
+            return snapshot.docs.map(item => {
+                const device = item.data();
+                return {
+                    ...device,
+                    enabled: device.enabled !== false,
+                    online: Number(device.lastSeen) >= cutoff
+                };
+            }).filter(device => device.deleted !== true);
+        });
+}
+
 function submitGlobalPollResponse(branchId, pollId, answer) {
     if (typeof pollId !== "string" || !pollId || !["yes", "no"].includes(answer)) {
         throw new Error("إجابة الاستطلاع غير صالحة.");
@@ -426,26 +493,260 @@ function submitGlobalPollResponse(branchId, pollId, answer) {
 
 async function getManagerMonitoringSettings() {
     const reference = doc(database, "systemSettings", "monitoring");
-    const snapshot = await getDoc(reference);
-    if (snapshot.exists()) return { ...defaultManagerMonitoringSettings, ...snapshot.data() };
+    const [snapshot, branchExperienceSettings, closingDraftsSnapshot] = await Promise.all([
+        getDoc(reference),
+        getBranchExperienceSettings(),
+        getDoc(doc(database, "systemSettings", "closingDrafts"))
+    ]);
+    const closingDraftsEnabled = closingDraftsSnapshot.exists()
+        ? closingDraftsSnapshot.data().enabled !== false
+        : true;
+    if (snapshot.exists()) {
+        const monitoringSettings = { ...defaultManagerMonitoringSettings, ...snapshot.data() };
+        monitoringSettings.autoRefreshEnabled = monitoringSettings.autoRefreshEnabled === true;
+        if (![15, 30, 60].includes(Number(monitoringSettings.refreshIntervalMinutes))) {
+            monitoringSettings.refreshIntervalMinutes = defaultManagerMonitoringSettings.refreshIntervalMinutes;
+        }
+        return { ...monitoringSettings, ...branchExperienceSettings, closingDraftsEnabled };
+    }
     await setDoc(reference, { ...defaultManagerMonitoringSettings, updatedAt: Date.now() });
-    return { ...defaultManagerMonitoringSettings };
+    return { ...defaultManagerMonitoringSettings, ...branchExperienceSettings, closingDraftsEnabled };
+}
+
+function watchClosingDraftsSetting(onUpdate, onError) {
+    return onSnapshot(doc(database, "systemSettings", "closingDrafts"), snapshot => {
+        onUpdate(snapshot.exists() ? snapshot.data().enabled !== false : true);
+    }, onError);
+}
+
+async function getBranchExperienceSettings() {
+    const snapshot = await getDoc(doc(database, "systemSettings", "branchExperience"));
+    const settings = { ...defaultBranchExperienceSettings, ...(snapshot.exists() ? snapshot.data() : {}) };
+    if (!isValidBranchExperienceSettings(settings)) {
+        throw new Error("إعدادات متابعة الفروع غير صالحة.");
+    }
+    return settings;
+}
+
+function watchBranchExperienceSettings(onUpdate, onError) {
+    return onSnapshot(doc(database, "systemSettings", "branchExperience"), snapshot => {
+        const settings = { ...defaultBranchExperienceSettings, ...(snapshot.exists() ? snapshot.data() : {}) };
+        if (!isValidBranchExperienceSettings(settings)) {
+            onError(new Error("إعدادات متابعة الفروع غير صالحة."));
+            return;
+        }
+        onUpdate(settings);
+    }, onError);
+}
+
+function isValidBranchExperienceSettings(settings) {
+    return [3, 4].includes(Number(settings.customerNumberDigits))
+        && Number.isFinite(Number(settings.rankingVeryClosePercent))
+        && Number(settings.rankingVeryClosePercent) >= 0
+        && Number.isFinite(Number(settings.rankingClosePercent))
+        && Number(settings.rankingClosePercent) > Number(settings.rankingVeryClosePercent)
+        && Number.isFinite(Number(settings.rankingFarPercent))
+        && Number(settings.rankingFarPercent) > Number(settings.rankingClosePercent)
+        && Number(settings.rankingFarPercent) <= 100;
+}
+
+async function saveBranchExperienceSettings(settings) {
+    if (!isValidBranchExperienceSettings(settings)) {
+        throw new Error("راجع عدد الأرقام ونسب قرب الترتيب؛ يجب أن تكون النسب تصاعدية وحتى 100٪.");
+    }
+    const updates = {
+        customerNumberDigits: Number(settings.customerNumberDigits),
+        rankingVeryClosePercent: Number(settings.rankingVeryClosePercent),
+        rankingClosePercent: Number(settings.rankingClosePercent),
+        rankingFarPercent: Number(settings.rankingFarPercent),
+        updatedAt: Date.now()
+    };
+    await setDoc(doc(database, "systemSettings", "branchExperience"), updates, { merge: true });
+    return updates;
 }
 
 async function saveManagerMonitoringSettings(settings) {
     const updates = {};
-    for (const key of ["reportsEnabled", "outboundEnabled", "cashierInteractionEnabled", "remindersEnabled"]) {
+    for (const key of ["outboundEnabled", "cashierInteractionEnabled", "remindersEnabled", "autoRefreshEnabled"]) {
         if (typeof settings[key] === "boolean") updates[key] = settings[key];
     }
-    if ([0, 1, 5, 15].includes(settings.refreshIntervalMinutes)) {
+    if ([15, 30, 60].includes(settings.refreshIntervalMinutes)) {
         updates.refreshIntervalMinutes = settings.refreshIntervalMinutes;
     }
+    if (typeof settings.closingDraftsEnabled === "boolean") {
+        updates.closingDraftsEnabled = settings.closingDraftsEnabled;
+    }
     if (!Object.keys(updates).length) throw new Error("لا توجد إعدادات متابعة صالحة للحفظ.");
-    await setDoc(doc(database, "systemSettings", "monitoring"), {
-        ...updates,
-        updatedAt: Date.now()
-    }, { merge: true });
+    const { closingDraftsEnabled, ...monitoringUpdates } = updates;
+    if (Object.keys(monitoringUpdates).length) {
+        await setDoc(doc(database, "systemSettings", "monitoring"), {
+            ...monitoringUpdates,
+            updatedAt: Date.now()
+        }, { merge: true });
+    }
+    if (typeof closingDraftsEnabled === "boolean") {
+        await setDoc(doc(database, "systemSettings", "closingDrafts"), {
+            enabled: closingDraftsEnabled,
+            updatedAt: Date.now()
+        }, { merge: true });
+    }
     return updates;
+}
+
+function isValidCommissionRules(rules) {
+    if (!rules || !Array.isArray(rules.tiers) || !rules.tiers.length || rules.tiers.length > 50) return false;
+    if (!Number.isFinite(Number(rules.incrementAmount)) || Number(rules.incrementAmount) <= 0
+        || !Number.isFinite(Number(rules.incrementFee)) || Number(rules.incrementFee) < 0) return false;
+    let previousAmount = -1;
+    return rules.tiers.every(tier => {
+        const minAmount = Number(tier?.minAmount);
+        const fee = Number(tier?.fee);
+        if (!Number.isFinite(minAmount) || minAmount < 0 || minAmount <= previousAmount
+            || !Number.isFinite(fee) || fee < 0) return false;
+        previousAmount = minAmount;
+        return true;
+    });
+}
+
+function normalizeCommissionRules(value) {
+    const rules = value || defaultCommissionRules;
+    if (!isValidCommissionRules(rules)) throw new Error("جدول العمولات المحفوظ غير صالح.");
+    return {
+        tiers: rules.tiers.map(tier => ({
+            minAmount: Number(tier.minAmount),
+            fee: Number(tier.fee)
+        })),
+        incrementAmount: Number(rules.incrementAmount),
+        incrementFee: Number(rules.incrementFee)
+    };
+}
+
+function getCommissionRules() {
+    return getDoc(doc(database, "systemSettings", "commissionRules")).then(snapshot =>
+        normalizeCommissionRules(snapshot.exists() ? snapshot.data() : defaultCommissionRules)
+    );
+}
+
+function watchCommissionRules(onUpdate, onError) {
+    return onSnapshot(doc(database, "systemSettings", "commissionRules"), snapshot => {
+        try {
+            onUpdate(normalizeCommissionRules(snapshot.exists() ? snapshot.data() : defaultCommissionRules));
+        } catch (error) {
+            onError(error);
+        }
+    }, onError);
+}
+
+async function saveCommissionRules(rules) {
+    const normalized = normalizeCommissionRules(rules);
+    const saved = { ...normalized, updatedAt: Date.now() };
+    await setDoc(doc(database, "systemSettings", "commissionRules"), saved);
+    return normalized;
+}
+
+function isValidDailyTargets(targets) {
+    if (!targets || typeof targets !== "object"
+        || typeof targets.enabled !== "boolean"
+        || (targets.date !== "" && !/^\d{4}-\d{2}-\d{2}$/.test(String(targets.date || "")))
+        || (targets.enabled && !/^\d{4}-\d{2}-\d{2}$/.test(String(targets.date || "")))
+        || !Number.isFinite(Number(targets.targetProfit)) || Number(targets.targetProfit) < 0
+        || !Number.isFinite(Number(targets.rewardAmount)) || Number(targets.rewardAmount) < 0
+        || !targets.branches || typeof targets.branches !== "object" || Array.isArray(targets.branches)) return false;
+    return Object.entries(targets.branches).every(([branchId, override]) =>
+        /^[A-Za-z0-9_-]{1,128}$/.test(branchId)
+        && override && typeof override === "object"
+        && (override.enabled === undefined || typeof override.enabled === "boolean")
+        && (override.targetProfit === null || override.targetProfit === undefined
+            || override.targetProfit === ""
+            || (Number.isFinite(Number(override.targetProfit)) && Number(override.targetProfit) >= 0))
+        && (override.rewardAmount === null || override.rewardAmount === undefined
+            || override.rewardAmount === ""
+            || (Number.isFinite(Number(override.rewardAmount)) && Number(override.rewardAmount) >= 0))
+    );
+}
+
+function normalizeDailyTargets(value) {
+    const targets = value || defaultDailyTargets;
+    if (!isValidDailyTargets(targets)) throw new Error("إعدادات هدف اليوم المحفوظة غير صالحة.");
+    return {
+        date: String(targets.date),
+        enabled: targets.enabled,
+        targetProfit: Number(targets.targetProfit),
+        rewardAmount: Number(targets.rewardAmount),
+        branches: Object.fromEntries(Object.entries(targets.branches).map(([branchId, override]) => [
+            branchId,
+            {
+                enabled: override.enabled,
+                targetProfit: override.targetProfit == null || override.targetProfit === "" ? null : Number(override.targetProfit),
+                rewardAmount: override.rewardAmount == null || override.rewardAmount === "" ? null : Number(override.rewardAmount)
+            }
+        ]))
+    };
+}
+
+function getDailyTargets() {
+    return getDoc(doc(database, "systemSettings", "dailyTargets")).then(snapshot =>
+        normalizeDailyTargets(snapshot.exists() ? snapshot.data() : defaultDailyTargets)
+    );
+}
+
+function watchDailyTargets(onUpdate, onError) {
+    return onSnapshot(doc(database, "systemSettings", "dailyTargets"), snapshot => {
+        try {
+            onUpdate(normalizeDailyTargets(snapshot.exists() ? snapshot.data() : defaultDailyTargets));
+        } catch (error) {
+            onError(error);
+        }
+    }, onError);
+}
+
+async function saveDailyTargets(targets) {
+    const normalized = normalizeDailyTargets(targets);
+    await setDoc(doc(database, "systemSettings", "dailyTargets"), {
+        ...normalized,
+        updatedAt: Date.now()
+    });
+    return normalized;
+}
+
+function watchManagerLedgers(maxEntries, onChange, onError) {
+    const ledgersQuery = query(
+        collection(database, "managerLedgers"),
+        orderBy("createdAt", "desc"),
+        limit(maxEntries)
+    );
+    return onSnapshot(
+        ledgersQuery,
+        snapshot => onChange(snapshot.docs.map(item => ({ id: item.id, ...item.data() }))),
+        onError
+    );
+}
+
+function getRecentManagerLedgers(maxEntries = 100) {
+    const ledgersQuery = query(
+        collection(database, "managerLedgers"),
+        orderBy("createdAt", "desc"),
+        limit(maxEntries)
+    );
+    return getDocs(ledgersQuery).then(snapshot =>
+        snapshot.docs.map(item => ({ id: item.id, ...item.data() }))
+    );
+}
+
+async function reviewManagerLedger(ledgerId, status) {
+    if (typeof ledgerId !== "string" || !ledgerId || !["approved", "rejected"].includes(status)) {
+        throw new Error("بيانات مراجعة سجل الخصومات غير صالحة.");
+    }
+    const reference = doc(database, "managerLedgers", ledgerId);
+    const snapshot = await getDoc(reference);
+    if (!snapshot.exists() || snapshot.data().type !== "deduction" || snapshot.data().status !== "pending") {
+        throw new Error("اقتراح الخصم غير موجود أو تمت مراجعته بالفعل.");
+    }
+    await updateDoc(reference, {
+        status,
+        reviewedAt: Date.now(),
+        reviewedBy: auth.currentUser?.email || ""
+    });
 }
 
 function acknowledgeAssistantNotice(branchId, noticeId) {
@@ -596,7 +897,7 @@ function watchBranchDevices(branchId, uid, onCount, onError, onDisabled) {
         if (active) onError(error);
     };
     const updateActiveCount = () => {
-        const cutoff = Date.now() - 90000;
+        const cutoff = Date.now() - branchDeviceOnlineWindow;
         if (active) onCount(latestDevices.filter(device =>
             device.enabled !== false && device.lastSeen >= cutoff
         ).length);
@@ -624,7 +925,7 @@ function watchBranchDevices(branchId, uid, onCount, onError, onDisabled) {
     }, reportError);
 
     heartbeat();
-    const interval = window.setInterval(heartbeat, 30000);
+    const interval = window.setInterval(heartbeat, branchDeviceHeartbeatInterval);
     const countInterval = window.setInterval(updateActiveCount, 30000);
     return () => {
         if (!active) return;
@@ -640,7 +941,7 @@ function watchBranchDeviceList(branchId, onDevices, onError) {
     let active = true;
     let latestDevices = [];
     const reportDevices = () => {
-        const cutoff = Date.now() - 90000;
+        const cutoff = Date.now() - branchDeviceOnlineWindow;
         if (active) onDevices(latestDevices.map(device => ({
             ...device,
             enabled: device.enabled !== false,
@@ -1109,7 +1410,22 @@ function watchLegacyTransactions(branchId, legacyUid, actor, onError) {
     };
 }
 
+function getActivityDetails(collectionName, before, after) {
+    const fields = collectionName === "transactions"
+        ? ["type", "walletId", "amount", "fee", "datetime", "customerName"]
+        : collectionName === "vouchers"
+            ? ["type", "customerId", "amount", "datetime", "date", "notes"]
+            : [];
+    return Object.fromEntries(fields
+        .filter(field => JSON.stringify(before?.[field] ?? null) !== JSON.stringify(after?.[field] ?? null))
+        .map(field => [field, {
+            before: before?.[field] ?? null,
+            after: after?.[field] ?? null
+        }]));
+}
+
 async function writeSnapshot(branchId, snapshot, actor) {
+    await flushPendingBranchWrites(branchId);
     const cache = getBranchCache(branchId);
     const nextCollections = {};
     const operations = [];
@@ -1131,7 +1447,8 @@ async function writeSnapshot(branchId, snapshot, actor) {
                     audit: {
                         collection: name,
                         recordId: id,
-                        action: cache.collections[name].has(id) ? "updated" : "created"
+                        action: cache.collections[name].has(id) ? "updated" : "created",
+                        details: getActivityDetails(name, cache.collections[name].get(id)?.value, value)
                     }
                 });
             }
@@ -1142,7 +1459,12 @@ async function writeSnapshot(branchId, snapshot, actor) {
                 operations.push({
                     type: "delete",
                     reference: doc(getBranchCollection(branchId, name), id),
-                    audit: { collection: name, recordId: id, action: "deleted" }
+                    audit: {
+                        collection: name,
+                        recordId: id,
+                        action: "deleted",
+                        details: getActivityDetails(name, cache.collections[name].get(id)?.value, null)
+                    }
                 });
             }
         });
@@ -1160,32 +1482,150 @@ async function writeSnapshot(branchId, snapshot, actor) {
     }
 
     for (let index = 0; index < operations.length; index += 200) {
-        const batch = writeBatch(database);
+        const writes = [];
         operations.slice(index, index + 200).forEach(operation => {
-            if (operation.type === "set") batch.set(operation.reference, operation.value);
-            else batch.delete(operation.reference);
+            writes.push(operation.type === "set"
+                ? { type: "set", path: operation.reference.path, value: operation.value }
+                : { type: "delete", path: operation.reference.path });
             if (actor?.actorUid && operation.audit && !actor.suppressActivity) {
                 const activityReference = doc(collection(database, "branches", branchId, "activityLogs"));
-                batch.set(activityReference, {
-                    branchId,
-                    branchName: actor.branchName || "",
-                    actorUid: actor.actorUid,
-                    actorEmail: actor.actorEmail || "",
-                    deviceId: actor.deviceId || "",
-                    action: operation.audit.action,
-                    collection: operation.audit.collection,
-                    recordId: operation.audit.recordId,
-                    occurredAt: serverTimestamp(),
-                    notifyManager: actor.notifyManager !== false
+                writes.push({
+                    type: "set",
+                    path: activityReference.path,
+                    value: {
+                        branchId,
+                        branchName: actor.branchName || "",
+                        actorUid: actor.actorUid,
+                        actorEmail: actor.actorEmail || "",
+                        deviceId: actor.deviceId || "",
+                        action: operation.audit.action,
+                        collection: operation.audit.collection,
+                        recordId: operation.audit.recordId,
+                        details: operation.audit.details || {},
+                        occurredAt: { [serverTimestampMarker]: true },
+                        notifyManager: actor.notifyManager !== false
+                    }
                 });
             }
         });
-        await batch.commit();
+        await commitQueuedBranchWrites(branchId, writes);
     }
 
     cache.collections = nextCollections;
     cache.settings = settings;
     cache.hasSettings = true;
+}
+
+function getPendingWritePrefix(branchId) {
+    return `${pendingWriteStoragePrefix}:${branchId}:`;
+}
+
+function getPendingWriteStorageKeys(branchId) {
+    const prefix = getPendingWritePrefix(branchId);
+    try {
+        return Object.keys(localStorage)
+            .filter(key => key.startsWith(prefix))
+            .sort();
+    } catch (error) {
+        const storageError = new Error("تعذر الوصول إلى التخزين المحلي لاستعادة العمليات المعلقة.");
+        storageError.cause = error;
+        throw storageError;
+    }
+}
+
+function isAllowedPendingWritePath(branchId, path) {
+    if (typeof path !== "string") return false;
+    const segments = path.split("/");
+    if (segments[0] !== "branches" || segments[1] !== branchId) return false;
+    return (segments.length === 6
+            && segments[2] === "data"
+            && collectionNames.includes(segments[3])
+            && segments[4] === "items"
+            && Boolean(segments[5]))
+        || (segments.length === 4
+            && segments[2] === "settings"
+            && segments[3] === "system")
+        || (segments.length === 4
+            && segments[2] === "activityLogs"
+            && Boolean(segments[3]));
+}
+
+function restorePendingWriteValue(value) {
+    if (Array.isArray(value)) return value.map(restorePendingWriteValue);
+    if (!value || typeof value !== "object") return value;
+    if (value[serverTimestampMarker] === true) return serverTimestamp();
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [
+        key,
+        restorePendingWriteValue(item)
+    ]));
+}
+
+async function commitPendingBranchWrite(branchId, storageKey) {
+    let pendingWrite;
+    try {
+        pendingWrite = JSON.parse(localStorage.getItem(storageKey));
+    } catch (error) {
+        const storageError = new Error("تعذر قراءة عملية معلقة من التخزين المحلي؛ لم يتم حذفها.");
+        storageError.cause = error;
+        throw storageError;
+    }
+    if (pendingWrite?.version !== 1
+        || pendingWrite.branchId !== branchId
+        || !Array.isArray(pendingWrite.writes)
+        || !pendingWrite.writes.length
+        || pendingWrite.writes.some(write =>
+            !["set", "delete"].includes(write.type)
+            || !isAllowedPendingWritePath(branchId, write.path)
+            || (write.type === "set" && (!write.value || typeof write.value !== "object"))
+        )) {
+        throw new Error("بيانات عملية معلقة غير صالحة؛ لم يتم إرسالها أو حذفها.");
+    }
+
+    const batch = writeBatch(database);
+    pendingWrite.writes.forEach(write => {
+        const reference = doc(database, write.path);
+        if (write.type === "set") {
+            batch.set(reference, restorePendingWriteValue(write.value));
+        } else {
+            batch.delete(reference);
+        }
+    });
+    await batch.commit();
+    try {
+        localStorage.removeItem(storageKey);
+    } catch (error) {
+        const storageError = new Error("تم رفع العملية إلى Firebase لكن تعذر حذف نسختها المحلية؛ ستتم إعادة المحاولة بأمان.");
+        storageError.cause = error;
+        throw storageError;
+    }
+}
+
+async function commitQueuedBranchWrites(branchId, writes) {
+    const storageKey = `${getPendingWritePrefix(branchId)}${Date.now()}-${crypto.randomUUID()}`;
+    try {
+        localStorage.setItem(storageKey, JSON.stringify({
+            version: 1,
+            branchId,
+            writes
+        }));
+    } catch (error) {
+        const storageError = new Error("تعذر حفظ العملية مؤقتًا في هذا الجهاز؛ لم يتم إرسالها إلى Firebase.");
+        storageError.cause = error;
+        throw storageError;
+    }
+    await commitPendingBranchWrite(branchId, storageKey);
+}
+
+async function flushPendingBranchWrites(branchId) {
+    const storageKeys = getPendingWriteStorageKeys(branchId);
+    for (const storageKey of storageKeys) {
+        await commitPendingBranchWrite(branchId, storageKey);
+    }
+    if (storageKeys.length) {
+        const latestSnapshot = await readBranchSnapshot(branchId);
+        cacheSnapshot(branchId, latestSnapshot.snapshot);
+    }
+    return storageKeys.length;
 }
 
 function saveSnapshot(branchId, snapshot, actor) {
@@ -1302,12 +1742,28 @@ const firebaseService = {
     clearGlobalPoll,
     getBranchCommunications,
     watchBranchMonitoringAlerts,
+    getRecentBranchMonitoringAlerts,
     watchManagerEmails,
+    getRecentManagerEmails,
     saveBranchPerformanceStatus,
     watchBranchCommunication,
+    getBranchDeviceList,
     submitGlobalPollResponse,
     getManagerMonitoringSettings,
+    watchClosingDraftsSetting,
     saveManagerMonitoringSettings,
+    getCommissionRules,
+    watchCommissionRules,
+    saveCommissionRules,
+    getDailyTargets,
+    watchDailyTargets,
+    saveDailyTargets,
+    watchManagerLedgers,
+    getRecentManagerLedgers,
+    reviewManagerLedger,
+    getBranchExperienceSettings,
+    watchBranchExperienceSettings,
+    saveBranchExperienceSettings,
     acknowledgeAssistantNotice,
     clearAssistantNotice,
     setBranchDailyFeesVisibility,
@@ -1327,6 +1783,7 @@ const firebaseService = {
     loadBranchSnapshot,
     deleteBranchTransactionsForDate,
     replaceBranchSnapshot,
+    flushPendingWrites: flushPendingBranchWrites,
     getRecentBranchActivity,
     getAllBranchActivity,
     getActivityContext(branchName) {

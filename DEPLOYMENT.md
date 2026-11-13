@@ -96,3 +96,15 @@ The system manager can set a new password from **إعدادات الفروع** w
 - Confirm that the manager can enable/disable branch accounts, change the branch-admin page permission, send/clear announcements, and review activity.
 - Confirm generated reports and alerts appear in the manager's internal **البريد المرسل** page, and that no external email is sent.
 - Keep backups outside the web server and limit access to them.
+
+## Smart monitoring: commissions, goals, audit, and closings
+
+The **المتابعة الذكية** manager page includes separate views for commission rules, daily targets and rewards, transaction/voucher edits, branch closings and monthly averages, and deduction/reward records. Deploy the updated Firestore rules and Cloud Functions before publishing the client; the functions check commission deviations, record achievements, and create manager-only ledger entries.
+
+Commission rules are shared by all branches in `systemSettings/commissionRules`. Cashier forms fill the configured commission automatically; the existing commission-edit permission still controls whether a cashier can override it. Overrides remain available for customer-paid commissions and are reported as deviations from the configured schedule. Updating the schedule does not rewrite historical transactions.
+
+Daily goals are stored in `systemSettings/dailyTargets` for a Cairo business date, with an optional branch-specific target and reward. A branch reward is recorded at most once per day in the manager-only `managerLedgers` collection when a transaction or shift closing reaches the target. After three distinct same-day commission violations, the system records a proposed half-day deduction for manager review; approval or rejection is an administrative record only and never performs a financial deduction.
+
+Transaction and voucher updates/deletions append before-and-after values to each branch's manager-only activity log. The monthly closing view combines transaction commissions and recorded machine profit, then divides by the elapsed calendar days in the month. These views are managerial reports; they do not alter branch balances or historical records.
+
+For rollout, test a manual commission override, a changed commission rule, a target reached from a cashier transaction and from a shift closing, the third same-day violation, and transaction/voucher edits or deletions using a non-production branch. Verify the resulting notices, audit rows, and ledger records in the manager's internal pages before opening the feature to all branches.
