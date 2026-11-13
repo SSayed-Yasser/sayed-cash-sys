@@ -1052,7 +1052,17 @@ const APP_TRANSLATIONS = {
                         { minAmount: 2591, fee: 30 }
                     ],
                     incrementAmount: 500,
-                    incrementFee: 5
+                    incrementFee: 5,
+                    depositRules: {
+                        tiers: [
+                            { minAmount: 0, fee: 5 },
+                            { minAmount: 1001, fee: 10 },
+                            { minAmount: 2001, fee: 15 }
+                        ],
+                        incrementAmount: 1000,
+                        incrementFee: 5,
+                        transferDeduction: 1
+                    }
                 },
                 commissionRules: {
                     tiers: [
@@ -1064,7 +1074,17 @@ const APP_TRANSLATIONS = {
                         { minAmount: 2591, fee: 30 }
                     ],
                     incrementAmount: 500,
-                    incrementFee: 5
+                    incrementFee: 5,
+                    depositRules: {
+                        tiers: [
+                            { minAmount: 0, fee: 5 },
+                            { minAmount: 1001, fee: 10 },
+                            { minAmount: 2001, fee: 15 }
+                        ],
+                        incrementAmount: 1000,
+                        incrementFee: 5,
+                        transferDeduction: 1
+                    }
                 },
                 dailyTargets: { date: '', enabled: false, targetProfit: 4000, rewardAmount: 100, branches: {} },
                 managerLedgers: [],
@@ -1948,14 +1968,14 @@ const APP_TRANSLATIONS = {
                     if (this.firebaseService.reconnect) {
                         await this.firebaseService.reconnect();
                     }
-                    const deviceAllowed = await this.firebaseService.registerBranchDevice(branch.id, user.uid);
+                    const deviceAllowed = await this.firebaseService.registerBranchDevice(branch.id, ownerUid);
                     if (!deviceAllowed) {
                         this.handleDeviceDisabled();
                         return;
                     }
                     this.deviceUnsubscribe = this.firebaseService.watchBranchDevices(
                         branch.id,
-                        user.uid,
+                        ownerUid,
                         count => { this.activeDeviceCount = count; },
                         error => {
                             if (this.isNetworkFailure(error)) this.markAppOffline();
@@ -2688,7 +2708,7 @@ const APP_TRANSLATIONS = {
                         || !['branches', 'communications', 'backup', 'insights', 'emails'].includes(page)) return;
                     this.managerAdminPage = page;
                     this.updateManagerInsightsTimer();
-                    if (page === 'insights' && this.managerMonitoringSettings.autoRefreshEnabled) this.loadManagerInsights();
+                    if (page === 'insights') this.loadManagerInsights();
                     if (page === 'emails') this.refreshManagerEmailLogs();
                 },
 
@@ -2903,6 +2923,22 @@ const APP_TRANSLATIONS = {
                     this.managerCommissionRules.tiers.splice(index, 1);
                 },
 
+                addDepositCommissionTier() {
+                    const schedule = this.managerCommissionRules.depositRules;
+                    const last = schedule.tiers[schedule.tiers.length - 1];
+                    if (!last) return;
+                    schedule.tiers.push({
+                        minAmount: Number(last.minAmount) + Number(schedule.incrementAmount),
+                        fee: Number(last.fee) + Number(schedule.incrementFee)
+                    });
+                },
+
+                removeDepositCommissionTier(index) {
+                    const tiers = this.managerCommissionRules.depositRules.tiers;
+                    if (tiers.length <= 1) return;
+                    tiers.splice(index, 1);
+                },
+
                 async saveManagerCommissionRules() {
                     if (!this.managerSettingsUnlocked || this.managerCommissionRulesSaving) return;
                     const rules = {
@@ -2911,17 +2947,33 @@ const APP_TRANSLATIONS = {
                             fee: Number(tier.fee)
                         })).sort((left, right) => left.minAmount - right.minAmount),
                         incrementAmount: Number(this.managerCommissionRules.incrementAmount),
-                        incrementFee: Number(this.managerCommissionRules.incrementFee)
+                        incrementFee: Number(this.managerCommissionRules.incrementFee),
+                        depositRules: {
+                            tiers: this.managerCommissionRules.depositRules.tiers.map(tier => ({
+                                minAmount: Number(tier.minAmount),
+                                fee: Number(tier.fee)
+                            })).sort((left, right) => left.minAmount - right.minAmount),
+                            incrementAmount: Number(this.managerCommissionRules.depositRules.incrementAmount),
+                            incrementFee: Number(this.managerCommissionRules.depositRules.incrementFee),
+                            transferDeduction: Number(this.managerCommissionRules.depositRules.transferDeduction)
+                        }
                     };
-                    const validTiers = rules.tiers.length > 0
-                        && rules.tiers[0].minAmount === 0
-                        && rules.tiers.every((tier, index) =>
+                    const isValidTierSchedule = schedule => schedule.tiers.length > 0
+                        && schedule.tiers[0].minAmount === 0
+                        && schedule.tiers.every((tier, index) =>
                             Number.isFinite(tier.minAmount) && tier.minAmount >= 0
                             && Number.isFinite(tier.fee) && tier.fee >= 0
-                            && (!index || tier.minAmount > rules.tiers[index - 1].minAmount)
+                            && (!index || tier.minAmount > schedule.tiers[index - 1].minAmount)
                         );
-                    if (!validTiers || !Number.isFinite(rules.incrementAmount) || rules.incrementAmount <= 0
-                        || !Number.isFinite(rules.incrementFee) || rules.incrementFee < 0) {
+                    const validWithdrawalRules = isValidTierSchedule(rules)
+                        && Number.isFinite(rules.incrementAmount) && rules.incrementAmount > 0
+                        && Number.isFinite(rules.incrementFee) && rules.incrementFee >= 0;
+                    const validDepositRules = isValidTierSchedule(rules.depositRules)
+                        && Number.isFinite(rules.depositRules.incrementAmount) && rules.depositRules.incrementAmount > 0
+                        && Number.isFinite(rules.depositRules.incrementFee) && rules.depositRules.incrementFee >= 0
+                        && Number.isFinite(rules.depositRules.transferDeduction)
+                        && rules.depositRules.transferDeduction >= 0;
+                    if (!validWithdrawalRules || !validDepositRules) {
                         this.managerError = 'راجع جدول العمولات: يبدأ من مبلغ 0، والحدود تصاعدية، وزيادة ما بعد آخر شريحة صحيحة.';
                         return;
                     }
@@ -2931,7 +2983,7 @@ const APP_TRANSLATIONS = {
                         this.managerCommissionRules = await this.firebaseService.saveCommissionRules(rules);
                         this.commissionRules = this.managerCommissionRules;
                         this.commissionRulesReady = true;
-                        this.managerStatus = 'تم حفظ جدول العمولات الموحد، وسيظهر تلقائيًا على شاشات الكاشير.';
+                        this.managerStatus = 'تم حفظ جدولي العمولات للإيداع والسحب، وسيظهران تلقائيًا على شاشات الكاشير.';
                     } catch (error) {
                         this.managerError = `تعذر حفظ جدول العمولات: ${this.describeFirebaseError(error)}`;
                     } finally {
@@ -3234,6 +3286,16 @@ const APP_TRANSLATIONS = {
                             || left.name.localeCompare(right.name)
                         );
                         this.managerInsightsLastUpdated = Date.now();
+                        if (this.isSystemAdmin && this.managerSettingsUnlocked
+                            && this.managerBranchMetrics.some(branch => branch.active)) {
+                            try {
+                                await this.saveManagerBranchPerformanceStatuses();
+                            } catch (error) {
+                                this.managerNotice = 'تم تحديث الأهداف، لكن تعذر تحديث ترتيب الفروع.';
+                                this.managerNoticeDetails = this.describeFirebaseError(error);
+                                console.error('Branch rankings could not be refreshed:', error);
+                            }
+                        }
                         return true;
                     } catch (error) {
                         this.managerInsightsError = `تعذر تحديث متابعة الفروع: ${this.describeFirebaseError(error)}`;
@@ -4946,16 +5008,23 @@ const APP_TRANSLATIONS = {
                     const value = Number(amount);
                     if (!Number.isFinite(value) || value <= 0) return null;
                     if (!['deposit', 'withdraw'].includes(type)) return null;
-                    const tiers = [...this.commissionRules.tiers]
+                    const schedule = type === 'deposit'
+                        ? this.commissionRules.depositRules
+                        : this.commissionRules;
+                    const tiers = [...schedule.tiers]
                         .sort((left, right) => Number(left.minAmount) - Number(right.minAmount));
                     const eligibleTiers = tiers.filter(item => Number(item.minAmount) <= value);
                     const tier = eligibleTiers[eligibleTiers.length - 1];
                     if (!tier) return null;
                     const lastTier = tiers[tiers.length - 1];
                     const stepsBeyondLastTier = value > Number(lastTier.minAmount)
-                        ? Math.floor((value - Number(lastTier.minAmount)) / Number(this.commissionRules.incrementAmount))
+                        ? Math.floor((value - Number(lastTier.minAmount)) / Number(schedule.incrementAmount))
                         : 0;
-                    return Number(tier.fee) + stepsBeyondLastTier * Number(this.commissionRules.incrementFee);
+                    const fee = Number(tier.fee) + stepsBeyondLastTier * Number(schedule.incrementFee);
+                    const transferDeduction = type === 'deposit'
+                        ? Number(schedule.transferDeduction) || 0
+                        : 0;
+                    return Math.max(0, fee - transferDeduction);
                 },
 
                 async executeTransaction(type) {

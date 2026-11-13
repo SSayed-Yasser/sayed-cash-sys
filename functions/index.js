@@ -23,7 +23,17 @@ const defaultCommissionRules = {
         { minAmount: 2591, fee: 30 }
     ],
     incrementAmount: 500,
-    incrementFee: 5
+    incrementFee: 5,
+    depositRules: {
+        tiers: [
+            { minAmount: 0, fee: 5 },
+            { minAmount: 1001, fee: 10 },
+            { minAmount: 2001, fee: 15 }
+        ],
+        incrementAmount: 1000,
+        incrementFee: 5,
+        transferDeduction: 1
+    }
 };
 const defaultBranchExperienceSettings = {
     customerNumberDigits: 4,
@@ -634,11 +644,17 @@ function getExpectedTransactionFee(transaction, rules = defaultCommissionRules) 
     const amount = Number(transaction.amount);
     if (!Number.isFinite(amount) || amount <= 0) return null;
     if (!["deposit", "withdraw"].includes(transaction.type)) return null;
-    const tiers = (Array.isArray(rules.tiers) ? rules.tiers : defaultCommissionRules.tiers)
+    const schedule = transaction.type === "deposit"
+        ? rules.depositRules || defaultCommissionRules.depositRules
+        : rules;
+    const defaultTiers = transaction.type === "deposit"
+        ? defaultCommissionRules.depositRules.tiers
+        : defaultCommissionRules.tiers;
+    const tiers = (Array.isArray(schedule.tiers) ? schedule.tiers : defaultTiers)
         .slice()
         .sort((left, right) => Number(left.minAmount) - Number(right.minAmount));
-    const incrementAmount = Math.max(1, Number(rules.incrementAmount) || 500);
-    const incrementFee = Math.max(0, Number(rules.incrementFee) || 0);
+    const incrementAmount = Math.max(1, Number(schedule.incrementAmount) || 500);
+    const incrementFee = Math.max(0, Number(schedule.incrementFee) || 0);
     const eligibleTiers = tiers.filter(item => Number(item.minAmount) <= amount);
     const tier = eligibleTiers[eligibleTiers.length - 1];
     if (!tier) return null;
@@ -647,7 +663,10 @@ function getExpectedTransactionFee(transaction, rules = defaultCommissionRules) 
         ? Math.floor((amount - Number(lastTier.minAmount)) / incrementAmount)
         : 0;
     const baseFee = Number(tier.fee) || 0;
-    return Math.max(0, baseFee + stepsBeyondLastTier * incrementFee);
+    const transferDeduction = transaction.type === "deposit"
+        ? Math.max(0, Number(schedule.transferDeduction) || 0)
+        : 0;
+    return Math.max(0, baseFee + stepsBeyondLastTier * incrementFee - transferDeduction);
 }
 
 async function monitorBranchTransaction(branchId, transactionId, transaction, previousTransaction = null) {

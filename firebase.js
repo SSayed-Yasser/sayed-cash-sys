@@ -76,7 +76,17 @@ const defaultCommissionRules = {
         { minAmount: 2591, fee: 30 }
     ],
     incrementAmount: 500,
-    incrementFee: 5
+    incrementFee: 5,
+    depositRules: {
+        tiers: [
+            { minAmount: 0, fee: 5 },
+            { minAmount: 1001, fee: 10 },
+            { minAmount: 2001, fee: 15 }
+        ],
+        incrementAmount: 1000,
+        incrementFee: 5,
+        transferDeduction: 1
+    }
 };
 const defaultDailyTargets = {
     date: "",
@@ -611,13 +621,28 @@ function isValidCommissionRules(rules) {
 function normalizeCommissionRules(value) {
     const rules = value || defaultCommissionRules;
     if (!isValidCommissionRules(rules)) throw new Error("جدول العمولات المحفوظ غير صالح.");
+    const depositRules = rules.depositRules || defaultCommissionRules.depositRules;
+    if (!isValidCommissionRules(depositRules)
+        || !Number.isFinite(Number(depositRules.transferDeduction))
+        || Number(depositRules.transferDeduction) < 0) {
+        throw new Error("جدول عمولات الإيداع المحفوظ غير صالح.");
+    }
     return {
         tiers: rules.tiers.map(tier => ({
             minAmount: Number(tier.minAmount),
             fee: Number(tier.fee)
         })),
         incrementAmount: Number(rules.incrementAmount),
-        incrementFee: Number(rules.incrementFee)
+        incrementFee: Number(rules.incrementFee),
+        depositRules: {
+            tiers: depositRules.tiers.map(tier => ({
+                minAmount: Number(tier.minAmount),
+                fee: Number(tier.fee)
+            })),
+            incrementAmount: Number(depositRules.incrementAmount),
+            incrementFee: Number(depositRules.incrementFee),
+            transferDeduction: Number(depositRules.transferDeduction)
+        }
     };
 }
 
@@ -810,7 +835,7 @@ async function removeBranch(branchId, uid) {
     await batch.commit();
 }
 
-const deviceSessionId = (() => {
+let deviceSessionId = (() => {
     try {
         const existing = localStorage.getItem("sama-phone-device-session");
         if (existing) return existing;
@@ -822,6 +847,23 @@ const deviceSessionId = (() => {
         return crypto.randomUUID();
     }
 })();
+
+function getAccountDeviceSessionId(uid) {
+    try {
+        return localStorage.getItem(`sama-phone-device-session:${uid}`);
+    } catch (error) {
+        console.warn("Could not read the account device session ID:", error);
+        return null;
+    }
+}
+
+function saveAccountDeviceSessionId(uid, sessionId) {
+    try {
+        localStorage.setItem(`sama-phone-device-session:${uid}`, sessionId);
+    } catch (error) {
+        console.warn("Could not persist the account device session ID:", error);
+    }
+}
 
 function deviceBlockStorageKey(branchId) {
     return `sama-phone-device-blocked:${branchId}:${deviceSessionId}`;
@@ -866,9 +908,19 @@ function getDeviceName() {
 }
 
 async function registerBranchDevice(branchId, uid) {
+    deviceSessionId = getAccountDeviceSessionId(uid) || deviceSessionId;
+    let deviceReference = doc(database, "branchPresence", branchId, "devices", deviceSessionId);
+    let snapshot = await getDocFromServer(deviceReference);
+    if (snapshot.exists() && snapshot.data().uid !== uid) {
+        deviceSessionId = crypto.randomUUID();
+        saveAccountDeviceSessionId(uid, deviceSessionId);
+        deviceReference = doc(database, "branchPresence", branchId, "devices", deviceSessionId);
+        snapshot = await getDocFromServer(deviceReference);
+    } else {
+        saveAccountDeviceSessionId(uid, deviceSessionId);
+    }
+
     if (isBranchDeviceBlocked(branchId)) return false;
-    const deviceReference = doc(database, "branchPresence", branchId, "devices", deviceSessionId);
-    const snapshot = await getDocFromServer(deviceReference);
     if (snapshot.exists() && (snapshot.data().enabled === false || snapshot.data().deleted === true)) return false;
 
     const firstSeenAt = Number(snapshot.data()?.firstSeenAt) || Date.now();
